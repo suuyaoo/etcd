@@ -39,7 +39,6 @@ import (
 
 	gw "github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/soheilhy/cmux"
-	"github.com/tmc/grpc-websocket-proxy/wsproxy"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/trace"
@@ -357,18 +356,6 @@ func (sctx *serveCtx) registerGateway(dial func(ctx context.Context) (*grpc.Clie
 	return gwmux, nil
 }
 
-type wsProxyZapLogger struct {
-	*zap.Logger
-}
-
-func (w wsProxyZapLogger) Warnln(i ...interface{}) {
-	w.Warn(fmt.Sprint(i...))
-}
-
-func (w wsProxyZapLogger) Debugln(i ...interface{}) {
-	w.Debug(fmt.Sprint(i...))
-}
-
 func (sctx *serveCtx) createMux(gwmux *gw.ServeMux, handler http.Handler) *http.ServeMux {
 	httpmux := http.NewServeMux()
 	for path, h := range sctx.userHandlers {
@@ -378,18 +365,7 @@ func (sctx *serveCtx) createMux(gwmux *gw.ServeMux, handler http.Handler) *http.
 	if gwmux != nil {
 		httpmux.Handle(
 			"/v3/",
-			wsproxy.WebsocketProxy(
-				gwmux,
-				wsproxy.WithRequestMutator(
-					// Default to the POST method for streams
-					func(_ *http.Request, outgoing *http.Request) *http.Request {
-						outgoing.Method = "POST"
-						return outgoing
-					},
-				),
-				wsproxy.WithMaxRespBodyBufferSize(0x7fffffff),
-				wsproxy.WithLogger(wsProxyZapLogger{sctx.lg}),
-			),
+			gwmux,
 		)
 	}
 	if handler != nil {
