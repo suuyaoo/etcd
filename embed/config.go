@@ -43,7 +43,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
-	"sigs.k8s.io/yaml"
+	yaml "gopkg.in/yaml.v3"
 )
 
 const (

@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"go.etcd.io/etcd/embed"
-	"sigs.k8s.io/yaml"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestConfigParsingMemberFlags(t *testing.T) {

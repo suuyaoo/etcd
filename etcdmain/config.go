@@ -34,7 +34,7 @@ import (
 	"go.etcd.io/etcd/version"
 
 	"go.uber.org/zap"
-	"sigs.k8s.io/yaml"
+	yaml "gopkg.in/yaml.v3"
 )
 
 var (

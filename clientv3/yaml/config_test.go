@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"sigs.k8s.io/yaml"
+	yaml "gopkg.in/yaml.v3"
 )
 
 var (

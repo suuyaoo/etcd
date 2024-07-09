@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.etcd.io/etcd/pkg/transport"
 
-	"sigs.k8s.io/yaml"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestConfigFileOtherFields(t *testing.T) {

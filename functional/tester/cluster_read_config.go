@@ -25,7 +25,7 @@ import (
 	"go.etcd.io/etcd/functional/rpcpb"
 
 	"go.uber.org/zap"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func read(lg *zap.Logger, fpath string) (*Cluster, error) {
