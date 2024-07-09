@@ -77,8 +77,6 @@ func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 	if err = fileutil.Preallocate(f.File, fp.size, true); err != nil {
 		if fp.lg != nil {
 			fp.lg.Warn("failed to preallocate space when creating a new WAL", zap.Int64("size", fp.size), zap.Error(err))
-		} else {
-			plog.Errorf("failed to allocate space when creating new wal file (%v)", err)
 		}
 		f.Close()
 		return nil, err

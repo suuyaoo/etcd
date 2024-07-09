@@ -89,8 +89,6 @@ func (rc *Revision) Run() {
 					zap.Int64("revision", rev),
 					zap.Int64("revision-compaction-retention", rc.retention),
 				)
-			} else {
-				plog.Noticef("Starting auto-compaction at revision %d (retention: %d revisions)", rev, rc.retention)
 			}
 			_, err := rc.c.Compact(rc.ctx, &pb.CompactionRequest{Revision: rev})
 			if err == nil || err == mvcc.ErrCompacted {
@@ -102,8 +100,6 @@ func (rc *Revision) Run() {
 						zap.Int64("revision-compaction-retention", rc.retention),
 						zap.Duration("took", time.Since(now)),
 					)
-				} else {
-					plog.Noticef("Finished auto-compaction at revision %d", rev)
 				}
 			} else {
 				if rc.lg != nil {
@@ -114,9 +110,6 @@ func (rc *Revision) Run() {
 						zap.Duration("retry-interval", revInterval),
 						zap.Error(err),
 					)
-				} else {
-					plog.Noticef("Failed auto-compaction at revision %d (%v)", rev, err)
-					plog.Noticef("Retry after %v", revInterval)
 				}
 			}
 		}

@@ -35,8 +35,6 @@ func (s *EtcdServer) createMergedSnapshotMessage(m raftpb.Message, snapt, snapi 
 	if err != nil {
 		if lg := s.getLogger(); lg != nil {
 			lg.Panic("failed to save v2 store data", zap.Error(err))
-		} else {
-			plog.Panicf("store save should never fail: %v", err)
 		}
 	}
 
@@ -72,8 +70,6 @@ func newSnapshotReaderCloser(lg *zap.Logger, snapshot backend.Snapshot) io.ReadC
 					zap.Int64("bytes", n),
 					zap.String("size", humanize.Bytes(uint64(n))),
 				)
-			} else {
-				plog.Infof("wrote database snapshot out [total bytes: %d]", n)
 			}
 		} else {
 			if lg != nil {
@@ -82,8 +78,6 @@ func newSnapshotReaderCloser(lg *zap.Logger, snapshot backend.Snapshot) io.ReadC
 					zap.String("size", humanize.Bytes(uint64(n))),
 					zap.Error(err),
 				)
-			} else {
-				plog.Warningf("failed to write database snapshot out [written bytes: %d]: %v", n, err)
 			}
 		}
 		pw.CloseWithError(err)
@@ -91,8 +85,6 @@ func newSnapshotReaderCloser(lg *zap.Logger, snapshot backend.Snapshot) io.ReadC
 		if err != nil {
 			if lg != nil {
 				lg.Panic("failed to close database snapshot", zap.Error(err))
-			} else {
-				plog.Panicf("failed to close database snapshot: %v", err)
 			}
 		}
 	}()

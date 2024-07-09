@@ -91,8 +91,6 @@ func (ki *keyIndex) put(lg *zap.Logger, main int64, sub int64) {
 				zap.Int64("modified-revision-main", ki.modified.main),
 				zap.Int64("modified-revision-sub", ki.modified.sub),
 			)
-		} else {
-			plog.Panicf("store.keyindex: put with unexpected smaller revision [%v / %v]", rev, ki.modified)
 		}
 	}
 	if len(ki.generations) == 0 {
@@ -115,8 +113,6 @@ func (ki *keyIndex) restore(lg *zap.Logger, created, modified revision, ver int6
 				"'restore' got an unexpected non-empty generations",
 				zap.Int("generations-size", len(ki.generations)),
 			)
-		} else {
-			plog.Panicf("store.keyindex: cannot restore non-empty keyIndex")
 		}
 	}
 
@@ -136,8 +132,6 @@ func (ki *keyIndex) tombstone(lg *zap.Logger, main int64, sub int64) error {
 				"'tombstone' got an unexpected empty keyIndex",
 				zap.String("key", string(ki.key)),
 			)
-		} else {
-			plog.Panicf("store.keyindex: unexpected tombstone on empty keyIndex %s", string(ki.key))
 		}
 	}
 	if ki.generations[len(ki.generations)-1].isEmpty() {
@@ -158,8 +152,6 @@ func (ki *keyIndex) get(lg *zap.Logger, atRev int64) (modified, created revision
 				"'get' got an unexpected empty keyIndex",
 				zap.String("key", string(ki.key)),
 			)
-		} else {
-			plog.Panicf("store.keyindex: unexpected get on empty keyIndex %s", string(ki.key))
 		}
 	}
 	g := ki.findGeneration(atRev)
@@ -185,8 +177,6 @@ func (ki *keyIndex) since(lg *zap.Logger, rev int64) []revision {
 				"'since' got an unexpected empty keyIndex",
 				zap.String("key", string(ki.key)),
 			)
-		} else {
-			plog.Panicf("store.keyindex: unexpected get on empty keyIndex %s", string(ki.key))
 		}
 	}
 	since := revision{rev, 0}
@@ -233,8 +223,6 @@ func (ki *keyIndex) compact(lg *zap.Logger, atRev int64, available map[revision]
 				"'compact' got an unexpected empty keyIndex",
 				zap.String("key", string(ki.key)),
 			)
-		} else {
-			plog.Panicf("store.keyindex: unexpected compact on empty keyIndex %s", string(ki.key))
 		}
 	}
 

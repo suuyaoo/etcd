@@ -22,6 +22,7 @@ import (
 	"go.etcd.io/etcd/etcdserver/api/v2store"
 	"go.etcd.io/etcd/mvcc/backend"
 	"go.etcd.io/etcd/pkg/types"
+	"go.uber.org/zap"
 
 	"github.com/coreos/go-semver/semver"
 )
@@ -43,11 +44,11 @@ var (
 	storeRemovedMembersPrefix = path.Join(storePrefix, "removed_members")
 )
 
-func mustSaveMemberToBackend(be backend.Backend, m *Member) {
+func mustSaveMemberToBackend(lg *zap.Logger, be backend.Backend, m *Member) {
 	mkey := backendMemberKey(m.ID)
 	mvalue, err := json.Marshal(m)
 	if err != nil {
-		plog.Panicf("marshal raftAttributes should never fail: %v", err)
+		lg.Panic("failed to marshal member", zap.Error(err))
 	}
 
 	tx := be.BatchTx()
@@ -75,58 +76,58 @@ func mustSaveClusterVersionToBackend(be backend.Backend, ver *semver.Version) {
 	tx.UnsafePut(clusterBucketName, ckey, []byte(ver.String()))
 }
 
-func mustSaveMemberToStore(s v2store.Store, m *Member) {
+func mustSaveMemberToStore(lg *zap.Logger, s v2store.Store, m *Member) {
 	b, err := json.Marshal(m.RaftAttributes)
 	if err != nil {
-		plog.Panicf("marshal raftAttributes should never fail: %v", err)
+		lg.Panic("failed to marshal raftAttributes", zap.Error(err))
 	}
 	p := path.Join(MemberStoreKey(m.ID), raftAttributesSuffix)
 	if _, err := s.Create(p, false, string(b), false, v2store.TTLOptionSet{ExpireTime: v2store.Permanent}); err != nil {
-		plog.Panicf("create raftAttributes should never fail: %v", err)
+		lg.Panic("create raftAttributes should never fail", zap.Error(err))
 	}
 }
 
-func mustDeleteMemberFromStore(s v2store.Store, id types.ID) {
+func mustDeleteMemberFromStore(lg *zap.Logger, s v2store.Store, id types.ID) {
 	if _, err := s.Delete(MemberStoreKey(id), true, true); err != nil {
-		plog.Panicf("delete member should never fail: %v", err)
+		lg.Panic("delete member should never fail", zap.Error(err))
 	}
 	if _, err := s.Create(RemovedMemberStoreKey(id), false, "", false, v2store.TTLOptionSet{ExpireTime: v2store.Permanent}); err != nil {
-		plog.Panicf("create removedMember should never fail: %v", err)
+		lg.Panic("create removedMember should never fail", zap.Error(err))
 	}
 }
 
-func mustUpdateMemberInStore(s v2store.Store, m *Member) {
+func mustUpdateMemberInStore(lg *zap.Logger, s v2store.Store, m *Member) {
 	b, err := json.Marshal(m.RaftAttributes)
 	if err != nil {
-		plog.Panicf("marshal raftAttributes should never fail: %v", err)
+		lg.Panic("marshal raftAttributes should never fail", zap.Error(err))
 	}
 	p := path.Join(MemberStoreKey(m.ID), raftAttributesSuffix)
 	if _, err := s.Update(p, string(b), v2store.TTLOptionSet{ExpireTime: v2store.Permanent}); err != nil {
-		plog.Panicf("update raftAttributes should never fail: %v", err)
+		lg.Panic("update raftAttributes should never fail", zap.Error(err))
 	}
 }
 
-func mustUpdateMemberAttrInStore(s v2store.Store, m *Member) {
+func mustUpdateMemberAttrInStore(lg *zap.Logger, s v2store.Store, m *Member) {
 	b, err := json.Marshal(m.Attributes)
 	if err != nil {
-		plog.Panicf("marshal raftAttributes should never fail: %v", err)
+		lg.Panic("marshal raftAttributes should never fail", zap.Error(err))
 	}
 	p := path.Join(MemberStoreKey(m.ID), attributesSuffix)
 	if _, err := s.Set(p, false, string(b), v2store.TTLOptionSet{ExpireTime: v2store.Permanent}); err != nil {
-		plog.Panicf("update raftAttributes should never fail: %v", err)
+		lg.Panic("update raftAttributes should never fail", zap.Error(err))
 	}
 }
 
-func mustSaveClusterVersionToStore(s v2store.Store, ver *semver.Version) {
+func mustSaveClusterVersionToStore(lg *zap.Logger, s v2store.Store, ver *semver.Version) {
 	if _, err := s.Set(StoreClusterVersionKey(), false, ver.String(), v2store.TTLOptionSet{ExpireTime: v2store.Permanent}); err != nil {
-		plog.Panicf("save cluster version should never fail: %v", err)
+		lg.Panic("save cluster version should never fail", zap.Error(err))
 	}
 }
 
 // nodeToMember builds member from a key value node.
 // the child nodes of the given node MUST be sorted by key.
-func nodeToMember(n *v2store.NodeExtern) (*Member, error) {
-	m := &Member{ID: MustParseMemberIDFromKey(n.Key)}
+func nodeToMember(lg *zap.Logger, n *v2store.NodeExtern) (*Member, error) {
+	m := &Member{ID: MustParseMemberIDFromKey(lg, n.Key)}
 	attrs := make(map[string][]byte)
 	raftAttrKey := path.Join(n.Key, raftAttributesSuffix)
 	attrKey := path.Join(n.Key, attributesSuffix)
@@ -180,10 +181,10 @@ func MemberAttributesStorePath(id types.ID) string {
 	return path.Join(MemberStoreKey(id), attributesSuffix)
 }
 
-func MustParseMemberIDFromKey(key string) types.ID {
+func MustParseMemberIDFromKey(lg *zap.Logger, key string) types.ID {
 	id, err := types.IDFromString(path.Base(key))
 	if err != nil {
-		plog.Panicf("unexpected parse member id error: %v", err)
+		lg.Panic("unexpected parse member id error", zap.Error(err))
 	}
 	return id
 }

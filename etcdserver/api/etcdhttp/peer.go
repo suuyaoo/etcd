@@ -109,8 +109,6 @@ func (h *peerMembersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(ms); err != nil {
 		if h.lg != nil {
 			h.lg.Warn("failed to encode membership members", zap.Error(err))
-		} else {
-			plog.Warningf("failed to encode members response (%v)", err)
 		}
 	}
 }
@@ -150,8 +148,6 @@ func (h *peerMemberPromoteHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 				zap.String("member-id", types.ID(id).String()),
 				zap.Error(err),
 			)
-		} else {
-			plog.Errorf("error promoting member %s (%v)", types.ID(id).String(), err)
 		}
 		return
 	}
@@ -161,8 +157,6 @@ func (h *peerMemberPromoteHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		if h.lg != nil {
 			h.lg.Warn("failed to encode members response", zap.Error(err))
-		} else {
-			plog.Warningf("failed to encode members response (%v)", err)
 		}
 	}
 }

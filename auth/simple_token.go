@@ -135,8 +135,6 @@ func (t *tokenSimple) assignSimpleTokenToUser(username, token string) {
 				zap.String("user-name", username),
 				zap.String("token", token),
 			)
-		} else {
-			plog.Panicf("token %s is already used", token)
 		}
 	}
 
@@ -176,8 +174,6 @@ func (t *tokenSimple) enable() {
 					zap.String("user-name", username),
 					zap.String("token", tk),
 				)
-			} else {
-				plog.Infof("deleting token %s for user %s", tk, username)
 			}
 			delete(t.simpleTokens, tk)
 		}

@@ -21,13 +21,8 @@ import (
 
 	pb "go.etcd.io/etcd/etcdserver/etcdserverpb"
 
-	"github.com/coreos/pkg/capnslog"
 	"github.com/jonboulle/clockwork"
 	"go.uber.org/zap"
-)
-
-var (
-	plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "compactor")
 )
 
 const (

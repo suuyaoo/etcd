@@ -75,7 +75,7 @@ func handleBackup(c *cli.Context) error {
 		destWAL = filepath.Join(c.String("backup-dir"), "member", "wal")
 	}
 
-	if err := fileutil.CreateDirAll(destSnap); err != nil {
+	if err := fileutil.CreateDirAll(zap.NewNop(), destSnap); err != nil {
 		log.Fatalf("failed creating backup snapshot dir %v: %v", destSnap, err)
 	}
 

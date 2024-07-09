@@ -16,21 +16,18 @@ package fileutil
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/coreos/pkg/capnslog"
+	"go.uber.org/zap"
 )
 
 const (
 	// PrivateFileMode grants owner to read/write a file.
 	PrivateFileMode = 0600
 )
-
-var plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "pkg/fileutil")
 
 // IsDirWriteable checks if dir is writable by writing and removing a file
 // to dir. It returns nil if dir is writable.
@@ -44,13 +41,16 @@ func IsDirWriteable(dir string) error {
 
 // TouchDirAll is similar to os.MkdirAll. It creates directories with 0700 permission if any directory
 // does not exists. TouchDirAll also ensures the given directory is writable.
-func TouchDirAll(dir string) error {
+func TouchDirAll(lg *zap.Logger, dir string) error {
+	if lg == nil {
+		lg = zap.NewNop()
+	}
 	// If path is already a directory, MkdirAll does nothing and returns nil, so,
 	// first check if dir exist with an expected permission mode.
 	if Exist(dir) {
 		err := CheckDirPermission(dir, PrivateDirMode)
 		if err != nil {
-			plog.Warningf("check file permission: %v", err)
+			lg.Warn("check file permission", zap.Error(err))
 		}
 	} else {
 		err := os.MkdirAll(dir, PrivateDirMode)
@@ -66,8 +66,8 @@ func TouchDirAll(dir string) error {
 
 // CreateDirAll is similar to TouchDirAll but returns error
 // if the deepest directory was not empty.
-func CreateDirAll(dir string) error {
-	err := TouchDirAll(dir)
+func CreateDirAll(lg *zap.Logger, dir string) error {
+	err := TouchDirAll(lg, dir)
 	if err == nil {
 		var ns []string
 		ns, err = ReadDir(dir)

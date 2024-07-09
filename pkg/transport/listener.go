@@ -124,7 +124,7 @@ func (info TLSInfo) Empty() bool {
 
 func SelfCert(lg *zap.Logger, dirpath string, hosts []string, additionalUsages ...x509.ExtKeyUsage) (info TLSInfo, err error) {
 	info.Logger = lg
-	err = fileutil.TouchDirAll(dirpath)
+	err = fileutil.TouchDirAll(lg, dirpath)
 	if err != nil {
 		if info.Logger != nil {
 			info.Logger.Warn(

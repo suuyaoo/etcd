@@ -95,8 +95,8 @@ func (sctx *serveCtx) serve(
 	logger := defaultLog.New(ioutil.Discard, "etcdhttp", 0)
 	<-s.ReadyNotify()
 
-	if sctx.lg == nil {
-		plog.Info("ready to serve client requests")
+	if sctx.lg != nil {
+		sctx.lg.Info("ready to serve client requests")
 	}
 
 	m := cmux.New(sctx.l)
@@ -159,16 +159,12 @@ func (sctx *serveCtx) serve(
 
 				if sctx.lg != nil {
 					sctx.lg.Warn("stopping insecure grpc server due to error", zap.Error(err))
-				} else {
-					plog.Warningf("stopping insecure grpc server due to error: %s", err)
 				}
 
 				gs.Stop()
 
 				if sctx.lg != nil {
 					sctx.lg.Warn("stopped insecure grpc server due to error", zap.Error(err))
-				} else {
-					plog.Warningf("stopped insecure grpc server due to error: %s", err)
 				}
 			}(gs)
 		}
@@ -199,8 +195,6 @@ func (sctx *serveCtx) serve(
 				zap.String("traffic", traffic),
 				zap.String("address", sctx.l.Addr().String()),
 			)
-		} else {
-			plog.Noticef("serving insecure client requests on %s, this is strongly discouraged!", sctx.l.Addr().String())
 		}
 	}
 
@@ -227,16 +221,12 @@ func (sctx *serveCtx) serve(
 
 				if sctx.lg != nil {
 					sctx.lg.Warn("stopping secure grpc server due to error", zap.Error(err))
-				} else {
-					plog.Warningf("stopping secure grpc server due to error: %s", err)
 				}
 
 				gs.Stop()
 
 				if sctx.lg != nil {
 					sctx.lg.Warn("stopped secure grpc server due to error", zap.Error(err))
-				} else {
-					plog.Warningf("stopped secure grpc server due to error: %s", err)
 				}
 			}(gs)
 		}
@@ -278,8 +268,6 @@ func (sctx *serveCtx) serve(
 				zap.String("traffic", traffic),
 				zap.String("address", sctx.l.Addr().String()),
 			)
-		} else {
-			plog.Infof("serving client requests on %s", sctx.l.Addr().String())
 		}
 	}
 
@@ -347,8 +335,6 @@ func (sctx *serveCtx) registerGateway(dial func(ctx context.Context) (*grpc.Clie
 					zap.String("address", sctx.l.Addr().String()),
 					zap.Error(cerr),
 				)
-			} else {
-				plog.Warningf("failed to close conn to %s: %v", sctx.l.Addr().String(), cerr)
 			}
 		}
 	}()
@@ -402,8 +388,6 @@ func (ac *accessController) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 					"rejecting HTTP request to prevent DNS rebinding attacks",
 					zap.String("host", host),
 				)
-			} else {
-				plog.Warningf("rejecting HTTP request from %q to prevent DNS rebinding attacks", host)
 			}
 			// TODO: use Go's "http.StatusMisdirectedRequest" (421)
 			// https://github.com/golang/go/commit/4b8a7eafef039af1834ef9bfa879257c4a72b7b5
@@ -492,8 +476,6 @@ func (sctx *serveCtx) registerUserHandler(s string, h http.Handler) {
 	if sctx.userHandlers[s] != nil {
 		if sctx.lg != nil {
 			sctx.lg.Warn("path is already registered by user handler", zap.String("path", s))
-		} else {
-			plog.Warningf("path %s already registered by user handler", s)
 		}
 		return
 	}

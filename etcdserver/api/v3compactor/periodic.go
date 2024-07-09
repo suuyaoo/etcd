@@ -137,8 +137,6 @@ func (pc *Periodic) Run() {
 					zap.Int64("revision", rev),
 					zap.Duration("compact-period", pc.period),
 				)
-			} else {
-				plog.Noticef("Starting auto-compaction at revision %d (retention: %v)", rev, pc.period)
 			}
 			_, err := pc.c.Compact(pc.ctx, &pb.CompactionRequest{Revision: rev})
 			if err == nil || err == mvcc.ErrCompacted {
@@ -149,8 +147,6 @@ func (pc *Periodic) Run() {
 						zap.Duration("compact-period", pc.period),
 						zap.Duration("took", time.Since(lastSuccess)),
 					)
-				} else {
-					plog.Noticef("Finished auto-compaction at revision %d", rev)
 				}
 				lastSuccess = pc.clock.Now()
 			} else {
@@ -162,9 +158,6 @@ func (pc *Periodic) Run() {
 						zap.Duration("retry-interval", retryInterval),
 						zap.Error(err),
 					)
-				} else {
-					plog.Noticef("Failed auto-compaction at revision %d (%v)", rev, err)
-					plog.Noticef("Retry after %v", retryInterval)
 				}
 			}
 		}

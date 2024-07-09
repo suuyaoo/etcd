@@ -54,7 +54,7 @@ const (
 // NewClientHandler generates a muxed http.Handler with the given parameters to serve etcd client requests.
 func NewClientHandler(lg *zap.Logger, server etcdserver.ServerPeer, timeout time.Duration) http.Handler {
 	mux := http.NewServeMux()
-	etcdhttp.HandleBasic(mux, server)
+	etcdhttp.HandleBasic(lg, mux, server)
 	handleV2(lg, mux, server, timeout)
 	return requestLogger(lg, mux)
 }
@@ -102,7 +102,7 @@ func handleV2(lg *zap.Logger, mux *http.ServeMux, server etcdserver.ServerV2, ti
 	mux.Handle(membersPrefix, mh)
 	mux.Handle(membersPrefix+"/", mh)
 	mux.Handle(machinesPrefix, mah)
-	handleAuth(mux, sech)
+	handleAuth(lg, mux, sech)
 }
 
 type keysHandler struct {
@@ -151,8 +151,6 @@ func (h *keysHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Should never be reached
 			if h.lg != nil {
 				h.lg.Warn("failed to write key event", zap.Error(err))
-			} else {
-				plog.Errorf("error writing event (%v)", err)
 			}
 		}
 		reportRequestCompleted(rr, startTime)
@@ -209,8 +207,6 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err := json.NewEncoder(w).Encode(mc); err != nil {
 				if h.lg != nil {
 					h.lg.Warn("failed to encode members response", zap.Error(err))
-				} else {
-					plog.Warningf("failed to encode members response (%v)", err)
 				}
 			}
 		case "leader":
@@ -224,8 +220,6 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err := json.NewEncoder(w).Encode(m); err != nil {
 				if h.lg != nil {
 					h.lg.Warn("failed to encode members response", zap.Error(err))
-				} else {
-					plog.Warningf("failed to encode members response (%v)", err)
 				}
 			}
 		default:
@@ -251,8 +245,6 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					zap.String("member-id", m.ID.String()),
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("error adding member %s (%v)", m.ID, err)
 			}
 			writeError(h.lg, w, r, err)
 			return
@@ -263,8 +255,6 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			if h.lg != nil {
 				h.lg.Warn("failed to encode members response", zap.Error(err))
-			} else {
-				plog.Warningf("failed to encode members response (%v)", err)
 			}
 		}
 
@@ -286,8 +276,6 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					zap.String("member-id", id.String()),
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("error removing member %s (%v)", id, err)
 			}
 			writeError(h.lg, w, r, err)
 		default:
@@ -320,8 +308,6 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					zap.String("member-id", m.ID.String()),
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("error updating member %s (%v)", m.ID, err)
 			}
 			writeError(h.lg, w, r, err)
 		default:
@@ -599,8 +585,6 @@ func writeKeyError(lg *zap.Logger, w http.ResponseWriter, err error) {
 					"v2 response error",
 					zap.String("internal-server-error", err.Error()),
 				)
-			} else {
-				mlog.MergeError(err)
 			}
 		default:
 			if lg != nil {
@@ -608,8 +592,6 @@ func writeKeyError(lg *zap.Logger, w http.ResponseWriter, err error) {
 					"unexpected v2 response error",
 					zap.String("internal-server-error", err.Error()),
 				)
-			} else {
-				mlog.MergeErrorf("got unexpected response error (%v)", err)
 			}
 		}
 		ee := v2error.NewError(v2error.EcodeRaftInternal, err.Error(), 0)
@@ -655,8 +637,6 @@ func handleKeyWatch(ctx context.Context, lg *zap.Logger, w http.ResponseWriter, 
 				// Should never be reached
 				if lg != nil {
 					lg.Warn("failed to encode event", zap.Error(err))
-				} else {
-					plog.Warningf("error writing event (%v)", err)
 				}
 				return
 			}

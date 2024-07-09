@@ -314,8 +314,7 @@ type Config struct {
 	ListenMetricsUrls     []url.URL
 	ListenMetricsUrlsJSON string `json:"listen-metrics-urls"`
 
-	// Logger is logger options: "zap", "capnslog".
-	// WARN: "capnslog" is being deprecated in v3.5.
+	// Logger is logger options: "zap".
 	Logger string `json:"logger"`
 	// LogLevel configures log level. Only supports debug, info, warn, error, panic, or fatal. Default 'info'.
 	LogLevel string `json:"log-level"`
@@ -355,10 +354,6 @@ type Config struct {
 	// Debug is true, to enable debug level logging.
 	// WARNING: to be deprecated in 3.5. Use "--log-level=debug" instead.
 	Debug bool `json:"debug"`
-	// LogPkgLevels is being deprecated in v3.5.
-	// Only valid if "logger" option is "capnslog".
-	// WARN: DO NOT USE THIS!
-	LogPkgLevels string `json:"log-package-levels"`
 
 	// UnsafeNoFsync disables all uses of fsync.
 	// Setting this is unsafe and will cause data loss.
@@ -445,27 +440,31 @@ func NewConfig() *Config {
 
 		loggerMu:            new(sync.RWMutex),
 		logger:              nil,
-		Logger:              "capnslog",
+		Logger:              "zap",
 		DeprecatedLogOutput: []string{DefaultLogOutput},
 		LogOutputs:          []string{DefaultLogOutput},
 		Debug:               false,
 		LogLevel:            logutil.DefaultLogLevel,
-		LogPkgLevels:        "",
 	}
 	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
 	return cfg
 }
 
-func logTLSHandshakeFailure(conn *tls.Conn, err error) {
+func logTLSHandshakeFailure(lg *zap.Logger, conn *tls.Conn, err error) {
 	state := conn.ConnectionState()
 	remoteAddr := conn.RemoteAddr().String()
 	serverName := state.ServerName
 	if len(state.PeerCertificates) > 0 {
 		cert := state.PeerCertificates[0]
 		ips, dns := cert.IPAddresses, cert.DNSNames
-		plog.Infof("rejected connection from %q (error %q, ServerName %q, IPAddresses %q, DNSNames %q)", remoteAddr, err.Error(), serverName, ips, dns)
+		if lg != nil {
+			lg.Info("rejected connection",
+				zap.String("from", remoteAddr), zap.Error(err), zap.String("ServerName", serverName), zap.Any("IPAddresses", ips), zap.Strings("DNSNames", dns))
+		}
 	} else {
-		plog.Infof("rejected connection from %q (error %q, ServerName %q)", remoteAddr, err.Error(), serverName)
+		if lg != nil {
+			lg.Info("rejected connection", zap.String("from", remoteAddr), zap.Error(err), zap.String("ServerName", serverName))
+		}
 	}
 }
 
@@ -618,8 +617,6 @@ func (cfg *Config) Validate() error {
 	if len(cfg.ListenClientHttpUrls) == 0 {
 		if cfg.logger != nil {
 			cfg.logger.Warn("Running http and grpc server on single port. This is not recommended for production.")
-		} else {
-			plog.Warning("Running http and grpc server on single port. This is not recommended for production.")
 		}
 	}
 	if err := checkBindURLs(cfg.ListenMetricsUrls); err != nil {
@@ -721,16 +718,12 @@ func (cfg *Config) PeerURLsMapAndToken(which string) (urlsmap types.URLsMap, tok
 		if cerr != nil {
 			if lg != nil {
 				lg.Warn("failed to resolve during SRV discovery", zap.Error(cerr))
-			} else {
-				plog.Errorf("couldn't resolve during SRV discovery (%v)", cerr)
 			}
 			return nil, "", cerr
 		}
 		for _, s := range clusterStrs {
 			if lg != nil {
 				lg.Info("got bootstrap from DNS for etcd-server", zap.String("node", s))
-			} else {
-				plog.Noticef("got bootstrap from DNS for etcd-server at %s", s)
 			}
 		}
 		clusterStr := strings.Join(clusterStrs, ",")
@@ -837,8 +830,6 @@ func (cfg *Config) ClientSelfCert() (err error) {
 	if !cfg.ClientTLSInfo.Empty() {
 		if cfg.logger != nil {
 			cfg.logger.Warn("ignoring client auto TLS since certs given")
-		} else {
-			plog.Warningf("ignoring client auto TLS since certs given")
 		}
 		return nil
 	}
@@ -863,8 +854,6 @@ func (cfg *Config) PeerSelfCert() (err error) {
 	if !cfg.PeerTLSInfo.Empty() {
 		if cfg.logger != nil {
 			cfg.logger.Warn("ignoring peer auto TLS since certs given")
-		} else {
-			plog.Warningf("ignoring peer auto TLS since certs given")
 		}
 		return nil
 	}

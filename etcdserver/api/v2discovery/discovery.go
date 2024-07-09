@@ -33,14 +33,11 @@ import (
 	"go.etcd.io/etcd/pkg/transport"
 	"go.etcd.io/etcd/pkg/types"
 
-	"github.com/coreos/pkg/capnslog"
 	"github.com/jonboulle/clockwork"
 	"go.uber.org/zap"
 )
 
 var (
-	plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "discovery")
-
 	ErrInvalidURL           = errors.New("discovery: invalid URL")
 	ErrBadSizeKey           = errors.New("discovery: size key is bad")
 	ErrSizeNotFound         = errors.New("discovery: size key not found")
@@ -115,8 +112,6 @@ func newProxyFunc(lg *zap.Logger, proxy string) (func(*http.Request) (*url.URL, 
 
 	if lg != nil {
 		lg.Info("running proxy with discovery", zap.String("proxy-url", proxyURL.String()))
-	} else {
-		plog.Infof("using proxy %q", proxyURL.String())
 	}
 	return http.ProxyURL(proxyURL), nil
 }
@@ -240,8 +235,6 @@ func (d *discovery) checkCluster() ([]*client.Node, uint64, uint64, error) {
 					zap.Error(err),
 					zap.String("err-detail", ce.Detail()),
 				)
-			} else {
-				plog.Error(ce.Detail())
 			}
 			return d.checkClusterRetry()
 		}
@@ -265,8 +258,6 @@ func (d *discovery) checkCluster() ([]*client.Node, uint64, uint64, error) {
 					zap.Error(err),
 					zap.String("err-detail", ce.Detail()),
 				)
-			} else {
-				plog.Error(ce.Detail())
 			}
 			return d.checkClusterRetry()
 		}
@@ -310,8 +301,6 @@ func (d *discovery) logAndBackoffForRetry(step string) {
 			zap.String("reason", step),
 			zap.Duration("backoff", retryTimeInSecond),
 		)
-	} else {
-		plog.Infof("%s: error connecting to %s, retrying in %s", step, d.url, retryTimeInSecond)
 	}
 	d.clock.Sleep(retryTimeInSecond)
 }
@@ -352,8 +341,6 @@ func (d *discovery) waitNodes(nodes []*client.Node, size uint64, index uint64) (
 					zap.String("discovery-url", d.url.String()),
 					zap.String("self", path.Base(d.selfKey())),
 				)
-			} else {
-				plog.Noticef("found self %s in the cluster", path.Base(d.selfKey()))
 			}
 		} else {
 			if d.lg != nil {
@@ -362,8 +349,6 @@ func (d *discovery) waitNodes(nodes []*client.Node, size uint64, index uint64) (
 					zap.String("discovery-url", d.url.String()),
 					zap.String("peer", path.Base(n.Key)),
 				)
-			} else {
-				plog.Noticef("found peer %s in the cluster", path.Base(n.Key))
 			}
 		}
 	}
@@ -377,13 +362,13 @@ func (d *discovery) waitNodes(nodes []*client.Node, size uint64, index uint64) (
 				zap.Int("found-peers", len(all)),
 				zap.Int("needed-peers", int(size-uint64(len(all)))),
 			)
-		} else {
-			plog.Noticef("found %d peer(s), waiting for %d more", len(all), size-uint64(len(all)))
 		}
 		resp, err := w.Next(context.Background())
 		if err != nil {
 			if ce, ok := err.(*client.ClusterError); ok {
-				plog.Error(ce.Detail())
+				if d.lg != nil {
+					d.lg.Error(ce.Detail())
+				}
 				return d.waitNodesRetry()
 			}
 			return nil, err
@@ -394,8 +379,6 @@ func (d *discovery) waitNodes(nodes []*client.Node, size uint64, index uint64) (
 				zap.String("discovery-url", d.url.String()),
 				zap.String("peer", path.Base(resp.Node.Key)),
 			)
-		} else {
-			plog.Noticef("found peer %s in the cluster", path.Base(resp.Node.Key))
 		}
 		all = append(all, resp.Node)
 	}
@@ -405,8 +388,6 @@ func (d *discovery) waitNodes(nodes []*client.Node, size uint64, index uint64) (
 			zap.String("discovery-url", d.url.String()),
 			zap.Int("found-peers", len(all)),
 		)
-	} else {
-		plog.Noticef("found %d needed peer(s)", len(all))
 	}
 	return all, nil
 }

@@ -532,8 +532,6 @@ func (a *applierV3backend) applyTxn(txn mvcc.TxnWrite, rt *pb.TxnRequest, txnPat
 			if err != nil {
 				if lg != nil {
 					lg.Panic("unexpected error during txn", zap.Error(err))
-				} else {
-					plog.Panicf("unexpected error during txn: %v", err)
 				}
 			}
 			respi.(*pb.ResponseOp_ResponseRange).ResponseRange = resp
@@ -542,8 +540,6 @@ func (a *applierV3backend) applyTxn(txn mvcc.TxnWrite, rt *pb.TxnRequest, txnPat
 			if err != nil {
 				if lg != nil {
 					lg.Panic("unexpected error during txn", zap.Error(err))
-				} else {
-					plog.Panicf("unexpected error during txn: %v", err)
 				}
 			}
 			respi.(*pb.ResponseOp_ResponsePut).ResponsePut = resp
@@ -552,8 +548,6 @@ func (a *applierV3backend) applyTxn(txn mvcc.TxnWrite, rt *pb.TxnRequest, txnPat
 			if err != nil {
 				if lg != nil {
 					lg.Panic("unexpected error during txn", zap.Error(err))
-				} else {
-					plog.Panicf("unexpected error during txn: %v", err)
 				}
 			}
 			respi.(*pb.ResponseOp_ResponseDeleteRange).ResponseDeleteRange = resp
@@ -634,8 +628,6 @@ func (a *applierV3backend) Alarm(ar *pb.AlarmRequest) (*pb.AlarmResponse, error)
 
 		if lg != nil {
 			lg.Warn("alarm raised", zap.String("alarm", m.Alarm.String()), zap.String("from", types.ID(m.MemberID).String()))
-		} else {
-			plog.Warningf("alarm %v raised by peer %s", m.Alarm, types.ID(m.MemberID))
 		}
 		switch m.Alarm {
 		case pb.AlarmType_CORRUPT:
@@ -645,8 +637,6 @@ func (a *applierV3backend) Alarm(ar *pb.AlarmRequest) (*pb.AlarmResponse, error)
 		default:
 			if lg != nil {
 				lg.Warn("unimplemented alarm activation", zap.String("alarm", fmt.Sprintf("%+v", m)))
-			} else {
-				plog.Errorf("unimplemented alarm activation (%+v)", m)
 			}
 		}
 	case pb.AlarmRequest_DEACTIVATE:
@@ -665,15 +655,11 @@ func (a *applierV3backend) Alarm(ar *pb.AlarmRequest) (*pb.AlarmResponse, error)
 			// TODO: check kv hash before deactivating CORRUPT?
 			if lg != nil {
 				lg.Warn("alarm disarmed", zap.String("alarm", m.Alarm.String()), zap.String("from", types.ID(m.MemberID).String()))
-			} else {
-				plog.Infof("alarm disarmed %+v", ar)
 			}
 			a.s.applyV3 = a.s.newApplierV3()
 		default:
 			if lg != nil {
 				lg.Warn("unimplemented alarm deactivation", zap.String("alarm", fmt.Sprintf("%+v", m)))
-			} else {
-				plog.Errorf("unimplemented alarm deactivation (%+v)", m)
 			}
 		}
 	default:

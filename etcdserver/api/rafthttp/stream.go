@@ -63,14 +63,16 @@ var (
 
 type streamType string
 
-func (t streamType) endpoint() string {
+func (t streamType) endpoint(lg *zap.Logger) string {
 	switch t {
 	case streamTypeMsgAppV2:
 		return path.Join(RaftStreamPrefix, "msgapp")
 	case streamTypeMessage:
 		return path.Join(RaftStreamPrefix, "message")
 	default:
-		plog.Panicf("unhandled stream type %v", t)
+		if lg != nil {
+			lg.Panic("unhandled stream type", zap.String("stream-type", t.String()))
+		}
 		return ""
 	}
 }
@@ -168,8 +170,6 @@ func (cw *streamWriter) run() {
 			zap.String("local-member-id", cw.localID.String()),
 			zap.String("remote-peer-id", cw.peerID.String()),
 		)
-	} else {
-		plog.Infof("started streaming with peer %s (writer)", cw.peerID)
 	}
 
 	for {
@@ -196,8 +196,6 @@ func (cw *streamWriter) run() {
 					zap.String("local-member-id", cw.localID.String()),
 					zap.String("remote-peer-id", cw.peerID.String()),
 				)
-			} else {
-				plog.Warningf("lost the TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 			}
 			heartbeatc, msgc = nil, nil
 
@@ -227,8 +225,6 @@ func (cw *streamWriter) run() {
 					zap.String("local-member-id", cw.localID.String()),
 					zap.String("remote-peer-id", cw.peerID.String()),
 				)
-			} else {
-				plog.Warningf("lost the TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 			}
 			heartbeatc, msgc = nil, nil
 			cw.r.ReportUnreachable(m.To)
@@ -244,7 +240,9 @@ func (cw *streamWriter) run() {
 			case streamTypeMessage:
 				enc = &messageEncoder{w: conn.Writer}
 			default:
-				plog.Panicf("unhandled stream type %s", conn.t)
+				if cw.lg != nil {
+					cw.lg.Panic("unhandled stream type", zap.String("stream-type", conn.t.String()))
+				}
 			}
 			if cw.lg != nil {
 				cw.lg.Info(
@@ -269,8 +267,6 @@ func (cw *streamWriter) run() {
 						zap.String("local-member-id", cw.localID.String()),
 						zap.String("remote-peer-id", cw.peerID.String()),
 					)
-				} else {
-					plog.Warningf("closed an existing TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 				}
 			}
 			if cw.lg != nil {
@@ -280,8 +276,6 @@ func (cw *streamWriter) run() {
 					zap.String("local-member-id", cw.localID.String()),
 					zap.String("remote-peer-id", cw.peerID.String()),
 				)
-			} else {
-				plog.Infof("established a TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 			}
 			heartbeatc, msgc = tickc.C, cw.msgc
 
@@ -293,8 +287,6 @@ func (cw *streamWriter) run() {
 						zap.String("stream-writer-type", t.String()),
 						zap.String("remote-peer-id", cw.peerID.String()),
 					)
-				} else {
-					plog.Infof("closed the TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 				}
 			}
 			if cw.lg != nil {
@@ -303,8 +295,6 @@ func (cw *streamWriter) run() {
 					zap.String("stream-writer-type", t.String()),
 					zap.String("remote-peer-id", cw.peerID.String()),
 				)
-			} else {
-				plog.Infof("stopped streaming with peer %s (writer)", cw.peerID)
 			}
 			close(cw.done)
 			return
@@ -335,8 +325,6 @@ func (cw *streamWriter) closeUnlocked() bool {
 				zap.String("remote-peer-id", cw.peerID.String()),
 				zap.Error(err),
 			)
-		} else {
-			plog.Errorf("peer %s (writer) connection close error: %v", cw.peerID, err)
 		}
 	}
 	if len(cw.msgc) > 0 {
@@ -409,8 +397,6 @@ func (cr *streamReader) run() {
 			zap.String("local-member-id", cr.tr.ID.String()),
 			zap.String("remote-peer-id", cr.peerID.String()),
 		)
-	} else {
-		plog.Infof("started streaming with peer %s (%s reader)", cr.peerID, t)
 	}
 
 	for {
@@ -428,8 +414,6 @@ func (cr *streamReader) run() {
 					zap.String("local-member-id", cr.tr.ID.String()),
 					zap.String("remote-peer-id", cr.peerID.String()),
 				)
-			} else {
-				plog.Infof("established a TCP streaming connection with peer %s (%s reader)", cr.peerID, cr.typ)
 			}
 			err = cr.decodeLoop(rc, t)
 			if cr.lg != nil {
@@ -440,8 +424,6 @@ func (cr *streamReader) run() {
 					zap.String("remote-peer-id", cr.peerID.String()),
 					zap.Error(err),
 				)
-			} else {
-				plog.Warningf("lost the TCP streaming connection with peer %s (%s reader)", cr.peerID, cr.typ)
 			}
 			switch {
 			// all data is read out
@@ -462,8 +444,6 @@ func (cr *streamReader) run() {
 					zap.String("local-member-id", cr.tr.ID.String()),
 					zap.String("remote-peer-id", cr.peerID.String()),
 				)
-			} else {
-				plog.Infof("stopped streaming with peer %s (%s reader)", cr.peerID, t)
 			}
 			close(cr.done)
 			return
@@ -477,8 +457,6 @@ func (cr *streamReader) run() {
 					zap.String("remote-peer-id", cr.peerID.String()),
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("streaming with peer %s (%s reader) rate limiter error: %v", cr.peerID, t, err)
 			}
 		}
 	}
@@ -495,8 +473,6 @@ func (cr *streamReader) decodeLoop(rc io.ReadCloser, t streamType) error {
 	default:
 		if cr.lg != nil {
 			cr.lg.Panic("unknown stream type", zap.String("type", t.String()))
-		} else {
-			plog.Panicf("unhandled stream type %s", t)
 		}
 	}
 	select {
@@ -558,8 +534,6 @@ func (cr *streamReader) decodeLoop(rc io.ReadCloser, t streamType) error {
 						zap.String("remote-peer-id", types.ID(m.To).String()),
 						zap.Bool("remote-peer-active", cr.status.isActive()),
 					)
-				} else {
-					plog.MergeWarningf("dropped internal raft message from %s since receiving buffer is full (overloaded network)", types.ID(m.From))
 				}
 			} else {
 				if cr.lg != nil {
@@ -571,8 +545,6 @@ func (cr *streamReader) decodeLoop(rc io.ReadCloser, t streamType) error {
 						zap.String("remote-peer-id", types.ID(m.To).String()),
 						zap.Bool("remote-peer-active", cr.status.isActive()),
 					)
-				} else {
-					plog.Debugf("dropped %s from %s since receiving buffer is full", m.Type, types.ID(m.From))
 				}
 			}
 			recvFailures.WithLabelValues(types.ID(m.From).String()).Inc()
@@ -591,7 +563,7 @@ func (cr *streamReader) stop() {
 func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 	u := cr.picker.pick()
 	uu := u
-	uu.Path = path.Join(t.endpoint(), cr.tr.ID.String())
+	uu.Path = path.Join(t.endpoint(cr.lg), cr.tr.ID.String())
 
 	if cr.lg != nil {
 		cr.lg.Debug(
@@ -672,8 +644,6 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 					zap.String("remote-peer-id", cr.peerID.String()),
 					zap.Error(errIncompatibleVersion),
 				)
-			} else {
-				plog.Errorf("request sent was ignored by peer %s (server version incompatible)", cr.peerID)
 			}
 			return nil, errIncompatibleVersion
 
@@ -687,9 +657,6 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 					zap.String("local-member-cluster-id", cr.tr.ClusterID.String()),
 					zap.Error(errClusterIDMismatch),
 				)
-			} else {
-				plog.Errorf("request sent was ignored (cluster ID mismatch: peer[%s]=%s, local=%s)",
-					cr.peerID, resp.Header.Get("X-Etcd-Cluster-ID"), cr.tr.ClusterID)
 			}
 			return nil, errClusterIDMismatch
 
@@ -714,8 +681,6 @@ func (cr *streamReader) close() {
 					zap.String("remote-peer-id", cr.peerID.String()),
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("peer %s (reader) connection close error: %v", cr.peerID, err)
 			}
 		}
 	}

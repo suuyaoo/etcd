@@ -226,7 +226,7 @@ func startGRPCProxy(cmd *cobra.Command, args []string) {
 		go func() {
 			mux := http.NewServeMux()
 			grpcproxy.HandleMetrics(mux, httpClient, client.Endpoints())
-			grpcproxy.HandleHealth(mux, client)
+			grpcproxy.HandleHealth(lg, mux, client)
 			lg.Info("gRPC proxy server metrics URL serving")
 			herr := http.Serve(mhttpl, mux)
 			if herr != nil {
@@ -238,9 +238,6 @@ func startGRPCProxy(cmd *cobra.Command, args []string) {
 	}
 
 	lg.Info("started gRPC proxy", zap.String("address", grpcProxyListenAddr))
-
-	// grpc-proxy is initialized, ready to serve
-	notifySystemd(lg)
 
 	fmt.Fprintln(os.Stderr, <-errc)
 	os.Exit(1)
@@ -374,9 +371,9 @@ func newGRPCProxyServer(lg *zap.Logger, client *clientv3.Client) *grpc.Server {
 	kvp, _ := grpcproxy.NewKvProxy(client)
 	watchp, _ := grpcproxy.NewWatchProxy(client.Ctx(), client)
 	if grpcProxyResolverPrefix != "" {
-		grpcproxy.Register(client, grpcProxyResolverPrefix, grpcProxyAdvertiseClientURL, grpcProxyResolverTTL)
+		grpcproxy.Register(lg, client, grpcProxyResolverPrefix, grpcProxyAdvertiseClientURL, grpcProxyResolverTTL)
 	}
-	clusterp, _ := grpcproxy.NewClusterProxy(client, grpcProxyAdvertiseClientURL, grpcProxyResolverPrefix)
+	clusterp, _ := grpcproxy.NewClusterProxy(lg, client, grpcProxyAdvertiseClientURL, grpcProxyResolverPrefix)
 	leasep, _ := grpcproxy.NewLeaseProxy(client.Ctx(), client)
 	mainp := grpcproxy.NewMaintenanceProxy(client)
 	authp := grpcproxy.NewAuthProxy(client)
@@ -406,7 +403,7 @@ func mustHTTPListener(lg *zap.Logger, m cmux.CMux, tlsinfo *transport.TLSInfo, c
 	httpmux := http.NewServeMux()
 	httpmux.HandleFunc("/", http.NotFound)
 	grpcproxy.HandleMetrics(httpmux, httpClient, c.Endpoints())
-	grpcproxy.HandleHealth(httpmux, c)
+	grpcproxy.HandleHealth(lg, httpmux, c)
 	if grpcProxyEnablePprof {
 		for p, h := range debugutil.PProfHandlers() {
 			httpmux.Handle(p, h)

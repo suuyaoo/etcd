@@ -200,8 +200,6 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					case <-time.After(internalTimeout):
 						if r.lg != nil {
 							r.lg.Warn("timed out sending read state", zap.Duration("timeout", internalTimeout))
-						} else {
-							plog.Warningf("timed out sending read state")
 						}
 					case <-r.stopped:
 						return
@@ -221,8 +219,6 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					if err := r.storage.Save(rd.HardState, rd.Entries); err != nil {
 						if r.lg != nil {
 							r.lg.Fatal("failed to save Raft hard state and entries", zap.Error(err))
-						} else {
-							plog.Fatalf("failed to save state and entries error: %v", err)
 						}
 					}
 				}
@@ -250,8 +246,6 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					if err := r.storage.SaveSnap(rd.Snapshot); err != nil {
 						if r.lg != nil {
 							r.lg.Fatal("failed to save Raft snapshot", zap.Error(err))
-						} else {
-							plog.Fatalf("failed to save Raft snapshot %v", err)
 						}
 					}
 					// gofail: var raftAfterSaveSnap struct{}
@@ -262,8 +256,6 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					if err := r.storage.Save(rd.HardState, rd.Entries); err != nil {
 						if r.lg != nil {
 							r.lg.Fatal("failed to save Raft hard state and entries", zap.Error(err))
-						} else {
-							plog.Fatalf("failed to save state and entries error: %v", err)
 						}
 					}
 				}
@@ -280,8 +272,6 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					if err := r.storage.Sync(); err != nil {
 						if r.lg != nil {
 							r.lg.Fatal("failed to sync Raft snapshot", zap.Error(err))
-						} else {
-							plog.Fatalf("failed to sync Raft snapshot %v", err)
 						}
 					}
 
@@ -292,16 +282,12 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					r.raftStorage.ApplySnapshot(rd.Snapshot)
 					if r.lg != nil {
 						r.lg.Info("applied incoming Raft snapshot", zap.Uint64("snapshot-index", rd.Snapshot.Metadata.Index))
-					} else {
-						plog.Infof("raft applied incoming snapshot at index %d", rd.Snapshot.Metadata.Index)
 					}
 					// gofail: var raftAfterApplySnap struct{}
 
 					if err := r.storage.Release(rd.Snapshot); err != nil {
 						if r.lg != nil {
 							r.lg.Fatal("failed to release Raft wal", zap.Error(err))
-						} else {
-							plog.Fatalf("failed to release Raft wal %v", err)
 						}
 					}
 					// gofail: var raftAfterWALRelease struct{}
@@ -445,9 +431,6 @@ func (r *raftNode) processMessages(ms []raftpb.Message) []raftpb.Message {
 						zap.Duration("expected-duration", 2*r.heartbeat),
 						zap.Duration("exceeded-duration", exceed),
 					)
-				} else {
-					plog.Warningf("failed to send out heartbeat on time (exceeded the %v timeout for %v, to %x)", r.heartbeat, exceed, ms[i].To)
-					plog.Warningf("server is likely overloaded")
 				}
 				heartbeatSendFailures.Inc()
 			}
@@ -472,8 +455,6 @@ func (r *raftNode) onStop() {
 	if err := r.storage.Close(); err != nil {
 		if r.lg != nil {
 			r.lg.Panic("failed to close Raft storage", zap.Error(err))
-		} else {
-			plog.Panicf("raft close storage error: %v", err)
 		}
 	}
 	close(r.done)
@@ -512,8 +493,6 @@ func startNode(cfg ServerConfig, cl *membership.RaftCluster, ids []types.ID) (id
 	if w, err = wal.Create(cfg.Logger, cfg.WALDir(), metadata); err != nil {
 		if cfg.Logger != nil {
 			cfg.Logger.Panic("failed to create WAL", zap.Error(err))
-		} else {
-			plog.Panicf("create wal error: %v", err)
 		}
 	}
 	if cfg.UnsafeNoFsync {
@@ -526,8 +505,6 @@ func startNode(cfg ServerConfig, cl *membership.RaftCluster, ids []types.ID) (id
 		if err != nil {
 			if cfg.Logger != nil {
 				cfg.Logger.Panic("failed to marshal member", zap.Error(err))
-			} else {
-				plog.Panicf("marshal member should never fail: %v", err)
 			}
 		}
 		peers[i] = raft.Peer{ID: uint64(id), Context: ctx}
@@ -539,8 +516,6 @@ func startNode(cfg ServerConfig, cl *membership.RaftCluster, ids []types.ID) (id
 			zap.String("local-member-id", id.String()),
 			zap.String("cluster-id", cl.ID().String()),
 		)
-	} else {
-		plog.Infof("starting member %s in cluster %s", id, cl.ID())
 	}
 	s = raft.NewMemoryStorage()
 	c := &raft.Config{
@@ -554,7 +529,6 @@ func startNode(cfg ServerConfig, cl *membership.RaftCluster, ids []types.ID) (id
 		PreVote:         cfg.PreVote,
 	}
 	if cfg.Logger != nil {
-		// called after capnslog setting in "init" function
 		if cfg.LoggerConfig != nil {
 			c.Logger, err = logutil.NewRaftLogger(cfg.LoggerConfig)
 			if err != nil {
@@ -590,8 +564,6 @@ func restartNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types.ID, *member
 			zap.String("local-member-id", id.String()),
 			zap.Uint64("commit-index", st.Commit),
 		)
-	} else {
-		plog.Infof("restarting member %s in cluster %s at commit index %d", id, cid, st.Commit)
 	}
 	cl := membership.NewCluster(cfg.Logger, "")
 	cl.SetID(id, cid)
@@ -612,7 +584,6 @@ func restartNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types.ID, *member
 		PreVote:         cfg.PreVote,
 	}
 	if cfg.Logger != nil {
-		// called after capnslog setting in "init" function
 		var err error
 		if cfg.LoggerConfig != nil {
 			c.Logger, err = logutil.NewRaftLogger(cfg.LoggerConfig)
@@ -648,8 +619,6 @@ func restartAsStandaloneNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types
 					zap.Uint64("commit-index-from-wal", st.Commit),
 					zap.Int("number-of-discarded-entries", len(ents)-i),
 				)
-			} else {
-				plog.Infof("discarding %d uncommitted WAL entries ", len(ents)-i)
 			}
 			ents = ents[:i]
 			break
@@ -671,8 +640,6 @@ func restartAsStandaloneNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types
 	if err != nil {
 		if cfg.Logger != nil {
 			cfg.Logger.Fatal("failed to save hard state and entries", zap.Error(err))
-		} else {
-			plog.Fatalf("%v", err)
 		}
 	}
 	if len(ents) != 0 {
@@ -686,8 +653,6 @@ func restartAsStandaloneNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types
 			zap.String("local-member-id", id.String()),
 			zap.Uint64("commit-index", st.Commit),
 		)
-	} else {
-		plog.Printf("forcing restart of member %s in cluster %s at commit index %d", id, cid, st.Commit)
 	}
 
 	cl := membership.NewCluster(cfg.Logger, "")
@@ -709,7 +674,6 @@ func restartAsStandaloneNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types
 		PreVote:         cfg.PreVote,
 	}
 	if cfg.Logger != nil {
-		// called after capnslog setting in "init" function
 		if cfg.LoggerConfig != nil {
 			c.Logger, err = logutil.NewRaftLogger(cfg.LoggerConfig)
 			if err != nil {
@@ -756,8 +720,6 @@ func getIDs(lg *zap.Logger, snap *raftpb.Snapshot, ents []raftpb.Entry) []uint64
 		default:
 			if lg != nil {
 				lg.Panic("unknown ConfChange Type", zap.String("type", cc.Type.String()))
-			} else {
-				plog.Panicf("ConfChange Type should be either ConfChangeAddNode or ConfChangeRemoveNode!")
 			}
 		}
 	}
@@ -796,8 +758,6 @@ func createConfigChangeEnts(lg *zap.Logger, ids []uint64, self uint64, term, ind
 		if err != nil {
 			if lg != nil {
 				lg.Panic("failed to marshal member", zap.Error(err))
-			} else {
-				plog.Panicf("marshal member should never fail: %v", err)
 			}
 		}
 		cc := &raftpb.ConfChange{

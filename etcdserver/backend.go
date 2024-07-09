@@ -88,9 +88,6 @@ func openBackend(cfg ServerConfig) backend.Backend {
 				zap.String("path", fn),
 				zap.Duration("took", time.Since(now)),
 			)
-		} else {
-			plog.Warningf("another etcd process is using %q and holds the file lock, or loading backend file is taking >10 seconds", fn)
-			plog.Warningf("waiting for it to exit before starting...")
 		}
 	}
 

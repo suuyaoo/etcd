@@ -32,7 +32,7 @@ func getMergedPerms(lg *zap.Logger, tx backend.BatchTx, userName string) *unifie
 	writePerms := adt.NewIntervalTree()
 
 	for _, roleName := range user.Roles {
-		role := getRole(tx, roleName)
+		role := getRole(lg, tx, roleName)
 		if role == nil {
 			continue
 		}
@@ -91,8 +91,6 @@ func checkKeyInterval(
 	default:
 		if lg != nil {
 			lg.Panic("unknown auth type", zap.String("auth-type", permtyp.String()))
-		} else {
-			plog.Panicf("unknown auth type: %v", permtyp)
 		}
 	}
 	return false
@@ -108,8 +106,6 @@ func checkKeyPoint(lg *zap.Logger, cachedPerms *unifiedRangePermissions, key []b
 	default:
 		if lg != nil {
 			lg.Panic("unknown auth type", zap.String("auth-type", permtyp.String()))
-		} else {
-			plog.Panicf("unknown auth type: %v", permtyp)
 		}
 	}
 	return false

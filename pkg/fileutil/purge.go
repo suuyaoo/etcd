@@ -44,8 +44,6 @@ func purgeFile(lg *zap.Logger, dirname string, suffix string, max uint, interval
 			zap.String("suffix", suffix),
 			zap.Uint("max", max),
 			zap.Duration("interval", interval))
-	} else {
-		plog.Infof("started to purge file, dir: %s, suffix: %s, max: %d, interval: %v", dirname, suffix, max, interval)
 	}
 
 	go func() {
@@ -57,8 +55,6 @@ func purgeFile(lg *zap.Logger, dirname string, suffix string, max uint, interval
 			if err != nil {
 				if lg != nil {
 					lg.Warn("failed to read files", zap.String("dir", dirname), zap.Error(err))
-				} else {
-					plog.Warningf("failed to read files, dir: %s, error: %v", dirname, err)
 				}
 				errC <- err
 				return
@@ -77,16 +73,12 @@ func purgeFile(lg *zap.Logger, dirname string, suffix string, max uint, interval
 				if err != nil {
 					if lg != nil {
 						lg.Warn("failed to lock file", zap.String("path", f), zap.Error(err))
-					} else {
-						plog.Warningf("failed to lock file, path: %s, error: %v", f, err)
 					}
 					break
 				}
 				if err = os.Remove(f); err != nil {
 					if lg != nil {
 						lg.Error("failed to remove file", zap.String("path", f), zap.Error(err))
-					} else {
-						plog.Errorf("failed to remove file, path: %s, error: %v", f, err)
 					}
 					errC <- err
 					return
@@ -94,16 +86,12 @@ func purgeFile(lg *zap.Logger, dirname string, suffix string, max uint, interval
 				if err = l.Close(); err != nil {
 					if lg != nil {
 						lg.Error("failed to unlock/close", zap.String("path", l.Name()), zap.Error(err))
-					} else {
-						plog.Errorf("error unlocking %s when purging file (%v)", l.Name(), err)
 					}
 					errC <- err
 					return
 				}
 				if lg != nil {
 					lg.Info("purged", zap.String("path", f))
-				} else {
-					plog.Infof("purged file %s successfully", f)
 				}
 				newfnames = newfnames[1:]
 			}

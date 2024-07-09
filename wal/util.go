@@ -45,8 +45,6 @@ func searchIndex(lg *zap.Logger, names []string, index uint64) (int, bool) {
 		if err != nil {
 			if lg != nil {
 				lg.Panic("failed to parse WAL file name", zap.String("path", name), zap.Error(err))
-			} else {
-				plog.Panicf("parse correct name should never fail: %v", err)
 			}
 		}
 		if index >= curIndex {
@@ -65,8 +63,6 @@ func isValidSeq(lg *zap.Logger, names []string) bool {
 		if err != nil {
 			if lg != nil {
 				lg.Panic("failed to parse WAL file name", zap.String("path", name), zap.Error(err))
-			} else {
-				plog.Panicf("parse correct name should never fail: %v", err)
 			}
 		}
 		if lastSeq != 0 && lastSeq != curSeq-1 {
@@ -100,8 +96,6 @@ func checkWalNames(lg *zap.Logger, names []string) []string {
 						"ignored file in WAL directory",
 						zap.String("path", name),
 					)
-				} else {
-					plog.Warningf("ignored file %v in wal", name)
 				}
 			}
 			continue

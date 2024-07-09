@@ -113,14 +113,10 @@ func (ls *LeaseServer) leaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) erro
 			if isClientCtxErr(stream.Context().Err(), err) {
 				if ls.lg != nil {
 					ls.lg.Debug("failed to receive lease keepalive request from gRPC stream", zap.Error(err))
-				} else {
-					plog.Debugf("failed to receive lease keepalive request from gRPC stream (%q)", err.Error())
 				}
 			} else {
 				if ls.lg != nil {
 					ls.lg.Warn("failed to receive lease keepalive request from gRPC stream", zap.Error(err))
-				} else {
-					plog.Warningf("failed to receive lease keepalive request from gRPC stream (%q)", err.Error())
 				}
 				streamFailures.WithLabelValues("receive", "lease-keepalive").Inc()
 			}
@@ -152,14 +148,10 @@ func (ls *LeaseServer) leaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) erro
 			if isClientCtxErr(stream.Context().Err(), err) {
 				if ls.lg != nil {
 					ls.lg.Debug("failed to send lease keepalive response to gRPC stream", zap.Error(err))
-				} else {
-					plog.Debugf("failed to send lease keepalive response to gRPC stream (%q)", err.Error())
 				}
 			} else {
 				if ls.lg != nil {
 					ls.lg.Warn("failed to send lease keepalive response to gRPC stream", zap.Error(err))
-				} else {
-					plog.Warningf("failed to send lease keepalive response to gRPC stream (%q)", err.Error())
 				}
 				streamFailures.WithLabelValues("send", "lease-keepalive").Inc()
 			}

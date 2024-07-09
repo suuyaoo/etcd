@@ -69,8 +69,6 @@ func NewWatchServer(s *etcdserver.EtcdServer) pb.WatchServer {
 					"adjusting watch progress notify interval to minimum period",
 					zap.Duration("min-watch-progress-notify-interval", minWatchProgressInterval),
 				)
-			} else {
-				plog.Warningf("adjusting watch progress notify interval to minimum period %v", minWatchProgressInterval)
 			}
 			s.Cfg.WatchProgressNotifyInterval = minWatchProgressInterval
 		}
@@ -199,14 +197,10 @@ func (ws *watchServer) Watch(stream pb.Watch_WatchServer) (err error) {
 			if isClientCtxErr(stream.Context().Err(), rerr) {
 				if sws.lg != nil {
 					sws.lg.Debug("failed to receive watch request from gRPC stream", zap.Error(rerr))
-				} else {
-					plog.Debugf("failed to receive watch request from gRPC stream (%q)", rerr.Error())
 				}
 			} else {
 				if sws.lg != nil {
 					sws.lg.Warn("failed to receive watch request from gRPC stream", zap.Error(rerr))
-				} else {
-					plog.Warningf("failed to receive watch request from gRPC stream (%q)", rerr.Error())
 				}
 				streamFailures.WithLabelValues("receive", "watch").Inc()
 			}
@@ -479,14 +473,10 @@ func (sws *serverWatchStream) sendLoop() {
 				if isClientCtxErr(sws.gRPCStream.Context().Err(), serr) {
 					if sws.lg != nil {
 						sws.lg.Debug("failed to send watch response to gRPC stream", zap.Error(serr))
-					} else {
-						plog.Debugf("failed to send watch response to gRPC stream (%q)", serr.Error())
 					}
 				} else {
 					if sws.lg != nil {
 						sws.lg.Warn("failed to send watch response to gRPC stream", zap.Error(serr))
-					} else {
-						plog.Warningf("failed to send watch response to gRPC stream (%q)", serr.Error())
 					}
 					streamFailures.WithLabelValues("send", "watch").Inc()
 				}
@@ -514,14 +504,10 @@ func (sws *serverWatchStream) sendLoop() {
 				if isClientCtxErr(sws.gRPCStream.Context().Err(), err) {
 					if sws.lg != nil {
 						sws.lg.Debug("failed to send watch control response to gRPC stream", zap.Error(err))
-					} else {
-						plog.Debugf("failed to send watch control response to gRPC stream (%q)", err.Error())
 					}
 				} else {
 					if sws.lg != nil {
 						sws.lg.Warn("failed to send watch control response to gRPC stream", zap.Error(err))
-					} else {
-						plog.Warningf("failed to send watch control response to gRPC stream (%q)", err.Error())
 					}
 					streamFailures.WithLabelValues("send", "watch").Inc()
 				}
@@ -548,14 +534,10 @@ func (sws *serverWatchStream) sendLoop() {
 						if isClientCtxErr(sws.gRPCStream.Context().Err(), err) {
 							if sws.lg != nil {
 								sws.lg.Debug("failed to send pending watch response to gRPC stream", zap.Error(err))
-							} else {
-								plog.Debugf("failed to send pending watch response to gRPC stream (%q)", err.Error())
 							}
 						} else {
 							if sws.lg != nil {
 								sws.lg.Warn("failed to send pending watch response to gRPC stream", zap.Error(err))
-							} else {
-								plog.Warningf("failed to send pending watch response to gRPC stream (%q)", err.Error())
 							}
 							streamFailures.WithLabelValues("send", "watch").Inc()
 						}

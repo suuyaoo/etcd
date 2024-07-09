@@ -173,8 +173,5 @@ func startGateway(cmd *cobra.Command, args []string) {
 		MonitorInterval: getewayRetryDelay,
 	}
 
-	// At this point, etcd gateway listener is initialized
-	notifySystemd(lg)
-
 	tp.Run()
 }

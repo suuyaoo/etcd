@@ -15,10 +15,11 @@
 package mvcc
 
 import (
-	"go.etcd.io/etcd/auth"
-	"go.etcd.io/etcd/clientv3"
 	"sync"
 	"time"
+
+	"go.etcd.io/etcd/auth"
+	"go.etcd.io/etcd/clientv3"
 
 	"go.etcd.io/etcd/lease"
 	"go.etcd.io/etcd/mvcc/backend"
@@ -422,8 +423,6 @@ func kvsToEvents(lg *zap.Logger, wg *watcherGroup, revs, vals [][]byte) (evs []m
 		if err := kv.Unmarshal(v); err != nil {
 			if lg != nil {
 				lg.Panic("failed to unmarshal mvccpb.KeyValue", zap.Error(err))
-			} else {
-				plog.Panicf("cannot unmarshal event: %v", err)
 			}
 		}
 
@@ -453,8 +452,6 @@ func (s *watchableStore) notify(rev int64, evs []mvccpb.Event) {
 					"unexpected multiple revisions in watch notification",
 					zap.Int("number-of-revisions", eb.revs),
 				)
-			} else {
-				plog.Panicf("unexpected multiple revisions in notification")
 			}
 		}
 		if w.send(WatchResponse{WatchID: w.id, Events: eb.evs, Revision: rev}) {

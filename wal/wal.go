@@ -31,7 +31,6 @@ import (
 	"go.etcd.io/etcd/raft/raftpb"
 	"go.etcd.io/etcd/wal/walpb"
 
-	"github.com/coreos/pkg/capnslog"
 	"go.uber.org/zap"
 )
 
@@ -53,8 +52,6 @@ var (
 	// value should be used, but this is defined as an exported variable
 	// so that tests can set a different segment size.
 	SegmentSizeBytes int64 = 64 * 1000 * 1000 // 64MB
-
-	plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "wal")
 
 	ErrMetadataConflict             = errors.New("wal: conflicting metadata found")
 	ErrFileNotFound                 = errors.New("wal: file not found")
@@ -112,7 +109,7 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 			return nil, err
 		}
 	}
-	if err := fileutil.CreateDirAll(tmpdirpath); err != nil {
+	if err := fileutil.CreateDirAll(lg, tmpdirpath); err != nil {
 		if lg != nil {
 			lg.Warn(
 				"failed to create a temporary WAL directory",
@@ -248,8 +245,6 @@ func (w *WAL) cleanupWAL(lg *zap.Logger) {
 	if err = w.Close(); err != nil {
 		if lg != nil {
 			lg.Panic("failed to close WAL during cleanup", zap.Error(err))
-		} else {
-			plog.Panicf("failed to close WAL during cleanup: %v", err)
 		}
 	}
 	brokenDirName := fmt.Sprintf("%s.broken.%v", w.dir, time.Now().Format("20060102.150405.999999"))
@@ -261,8 +256,6 @@ func (w *WAL) cleanupWAL(lg *zap.Logger) {
 				zap.String("source-path", w.dir),
 				zap.String("rename-path", brokenDirName),
 			)
-		} else {
-			plog.Panicf("failed to rename WAL during cleanup: %v", err)
 		}
 	}
 }
@@ -298,8 +291,6 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 			zap.String("from", tmpdirpath),
 			zap.String("to", w.dir),
 		)
-	} else {
-		plog.Infof("releasing file lock to rename %q to %q", tmpdirpath, w.dir)
 	}
 	w.Close()
 
@@ -782,8 +773,6 @@ func (w *WAL) cut() error {
 
 	if w.lg != nil {
 		w.lg.Info("created a new WAL segment", zap.String("path", fpath))
-	} else {
-		plog.Infof("segmented wal file %v is created", fpath)
 	}
 	return nil
 }
@@ -810,8 +799,6 @@ func (w *WAL) sync() error {
 				zap.Duration("took", took),
 				zap.Duration("expected-duration", warnSyncDuration),
 			)
-		} else {
-			plog.Warningf("sync duration of %v, expected less than %v", took, warnSyncDuration)
 		}
 	}
 	walFsyncSec.Observe(took.Seconds())
@@ -892,8 +879,6 @@ func (w *WAL) Close() error {
 		if err := l.Close(); err != nil {
 			if w.lg != nil {
 				w.lg.Warn("failed to close WAL", zap.Error(err))
-			} else {
-				plog.Errorf("failed to unlock during closing wal: %s", err)
 			}
 		}
 	}
@@ -997,8 +982,6 @@ func (w *WAL) seq() uint64 {
 	if err != nil {
 		if w.lg != nil {
 			w.lg.Fatal("failed to parse WAL name", zap.String("name", t.Name()), zap.Error(err))
-		} else {
-			plog.Fatalf("bad wal name %s (%v)", t.Name(), err)
 		}
 	}
 	return seq

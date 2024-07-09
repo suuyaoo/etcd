@@ -21,13 +21,11 @@ import (
 	pb "go.etcd.io/etcd/etcdserver/etcdserverpb"
 	"go.etcd.io/etcd/mvcc/backend"
 	"go.etcd.io/etcd/pkg/types"
-
-	"github.com/coreos/pkg/capnslog"
+	"go.uber.org/zap"
 )
 
 var (
 	alarmBucketName = []byte("alarm")
-	plog            = capnslog.NewPackageLogger("go.etcd.io/etcd", "alarm")
 )
 
 type BackendGetter interface {
@@ -38,14 +36,18 @@ type alarmSet map[types.ID]*pb.AlarmMember
 
 // AlarmStore persists alarms to the backend.
 type AlarmStore struct {
+	lg    *zap.Logger
 	mu    sync.Mutex
 	types map[pb.AlarmType]alarmSet
 
 	bg BackendGetter
 }
 
-func NewAlarmStore(bg BackendGetter) (*AlarmStore, error) {
-	ret := &AlarmStore{types: make(map[pb.AlarmType]alarmSet), bg: bg}
+func NewAlarmStore(lg *zap.Logger, bg BackendGetter) (*AlarmStore, error) {
+	if lg == nil {
+		lg = zap.NewNop()
+	}
+	ret := &AlarmStore{lg: lg, types: make(map[pb.AlarmType]alarmSet), bg: bg}
 	err := ret.restore()
 	return ret, err
 }
@@ -61,7 +63,7 @@ func (a *AlarmStore) Activate(id types.ID, at pb.AlarmType) *pb.AlarmMember {
 
 	v, err := newAlarm.Marshal()
 	if err != nil {
-		plog.Panicf("failed to marshal alarm member")
+		a.lg.Panic("failed to marshal alarm member", zap.Error(err))
 	}
 
 	b := a.bg.Backend()
@@ -90,7 +92,7 @@ func (a *AlarmStore) Deactivate(id types.ID, at pb.AlarmType) *pb.AlarmMember {
 
 	v, err := m.Marshal()
 	if err != nil {
-		plog.Panicf("failed to marshal alarm member")
+		a.lg.Panic("failed to marshal alarm member", zap.Error(err))
 	}
 
 	b := a.bg.Backend()

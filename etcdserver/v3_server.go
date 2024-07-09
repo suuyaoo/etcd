@@ -500,8 +500,6 @@ func (s *EtcdServer) Authenticate(ctx context.Context, r *pb.AuthenticateRequest
 						zap.String("user", r.Name),
 						zap.Error(err),
 					)
-				} else {
-					plog.Errorf("invalid authentication request to user %s was issued", r.Name)
 				}
 			}
 			return nil, err
@@ -529,8 +527,6 @@ func (s *EtcdServer) Authenticate(ctx context.Context, r *pb.AuthenticateRequest
 
 		if lg != nil {
 			lg.Info("revision when password checked became stale; retrying")
-		} else {
-			plog.Infof("revision when password checked is obsolete, retrying")
 		}
 	}
 
@@ -844,8 +840,6 @@ func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}, 
 						zap.Uint64("sent-request-id", requestId),
 						zap.Uint64("received-request-id", responseId),
 					)
-				} else {
-					plog.Warningf("ignored out-of-date read index response; local node read indexes queueing up and waiting to be in sync with leader (request ID want %d, got %d)", requestId, responseId)
 				}
 				slowReadIndex.Inc()
 				continue
@@ -859,8 +853,6 @@ func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}, 
 			firstCommitInTermNotifier = s.FirstCommitInTermNotify()
 			if lg != nil {
 				lg.Info("first commit in current term: resending ReadIndex request")
-			} else {
-				plog.Info("first commit in current term: resending ReadIndex request")
 			}
 			err := s.sendReadIndex(requestId)
 			if err != nil {
@@ -875,8 +867,6 @@ func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}, 
 					zap.Uint64("sent-request-id", requestId),
 					zap.Duration("retry-timeout", readIndexRetryTime),
 				)
-			} else {
-				plog.Warningf("waiting for ReadIndex response took too long, retrying (sent-request-id: %d, retry-timeout: %s)", requestId, readIndexRetryTime)
 			}
 			err := s.sendReadIndex(requestId)
 			if err != nil {
@@ -890,8 +880,6 @@ func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}, 
 					"timed out waiting for read index response (local node might have slow network)",
 					zap.Duration("timeout", s.Cfg.ReqTimeout()),
 				)
-			} else {
-				plog.Warningf("timed out waiting for read index response (local node might have slow network) timeout: %s", s.Cfg.ReqTimeout())
 			}
 			slowReadIndex.Inc()
 			return 0, ErrTimeout

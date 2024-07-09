@@ -143,7 +143,7 @@ type ServerConfig struct {
 	PreVote bool
 
 	// Logger logs server-side operations.
-	// If not nil, it disables "capnslog" and uses the given logger.
+	// If not nil, it uses the given logger.
 	Logger *zap.Logger
 
 	// LoggerConfig is server logger configuration for Raft logger.

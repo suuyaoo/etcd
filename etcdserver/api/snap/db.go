@@ -70,8 +70,6 @@ func (s *Snapshotter) SaveDBFrom(r io.Reader, id uint64) (int64, error) {
 			zap.Int64("bytes", n),
 			zap.String("size", humanize.Bytes(uint64(n))),
 		)
-	} else {
-		plog.Infof("saved database snapshot to disk [total bytes: %d]", n)
 	}
 
 	snapDBSaveSec.Observe(time.Since(start).Seconds())

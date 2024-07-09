@@ -20,21 +20,22 @@ import (
 
 	"go.etcd.io/etcd/etcdserver/api"
 	"go.etcd.io/etcd/etcdserver/api/v2http/httptypes"
+	"go.uber.org/zap"
 )
 
-func authCapabilityHandler(fn func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
+func authCapabilityHandler(lg *zap.Logger, fn func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !api.IsCapabilityEnabled(api.AuthCapability) {
-			notCapable(w, r, api.AuthCapability)
+			notCapable(lg, w, r, api.AuthCapability)
 			return
 		}
 		fn(w, r)
 	}
 }
 
-func notCapable(w http.ResponseWriter, r *http.Request, c api.Capability) {
+func notCapable(lg *zap.Logger, w http.ResponseWriter, r *http.Request, c api.Capability) {
 	herr := httptypes.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Not capable of accessing %s feature during rolling upgrades.", c))
 	if err := herr.WriteTo(w); err != nil {
-		plog.Debugf("error writing HTTPError (%v) to %s", err, r.RemoteAddr)
+		lg.Debug("error writing HTTPError", zap.Error(err), zap.String("remote addr", r.RemoteAddr))
 	}
 }

@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coreos/pkg/capnslog"
 	humanize "github.com/dustin/go-humanize"
 	bolt "go.etcd.io/bbolt"
 	"go.uber.org/zap"
@@ -41,8 +40,6 @@ var (
 	// the potential max db size can prevent writer from blocking reader.
 	// This only works for linux.
 	initialMmapSize = uint64(10 * 1024 * 1024 * 1024)
-
-	plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "mvcc/backend")
 
 	// minSnapshotWarningTimeout is the minimum threshold to trigger a long running snapshot warning.
 	minSnapshotWarningTimeout = 30 * time.Second
@@ -171,8 +168,6 @@ func newBackend(bcfg BackendConfig) *backend {
 	if err != nil {
 		if bcfg.Logger != nil {
 			bcfg.Logger.Panic("failed to open database", zap.String("path", bcfg.Path), zap.Error(err))
-		} else {
-			plog.Panicf("cannot open database at %s (%v)", bcfg.Path, err)
 		}
 	}
 
@@ -309,8 +304,6 @@ func (b *backend) Snapshot() Snapshot {
 	if err != nil {
 		if b.lg != nil {
 			b.lg.Fatal("failed to begin tx", zap.Error(err))
-		} else {
-			plog.Fatalf("cannot begin tx (%s)", err)
 		}
 	}
 
@@ -338,8 +331,6 @@ func (b *backend) Snapshot() Snapshot {
 						zap.Int64("bytes", dbBytes),
 						zap.String("size", humanize.Bytes(uint64(dbBytes))),
 					)
-				} else {
-					plog.Warningf("snapshotting is taking more than %v seconds to finish transferring %v MB [started at %v]", time.Since(start).Seconds(), float64(dbBytes)/float64(1024*1014), start)
 				}
 
 			case <-stopc:
@@ -492,8 +483,6 @@ func (b *backend) defrag() error {
 		if rmErr := os.RemoveAll(tmpdb.Path()); rmErr != nil {
 			if b.lg != nil {
 				b.lg.Error("failed to remove db.tmp after defragmentation completed", zap.Error(rmErr))
-			} else {
-				plog.Fatalf("failed to remove db.tmp after defragmentation completed: %v", rmErr)
 			}
 		}
 		return err
@@ -503,16 +492,12 @@ func (b *backend) defrag() error {
 	if err != nil {
 		if b.lg != nil {
 			b.lg.Fatal("failed to close database", zap.Error(err))
-		} else {
-			plog.Fatalf("cannot close database (%s)", err)
 		}
 	}
 	err = tmpdb.Close()
 	if err != nil {
 		if b.lg != nil {
 			b.lg.Fatal("failed to close tmp database", zap.Error(err))
-		} else {
-			plog.Fatalf("cannot close database (%s)", err)
 		}
 	}
 	// gofail: var defragBeforeRename struct{}
@@ -520,8 +505,6 @@ func (b *backend) defrag() error {
 	if err != nil {
 		if b.lg != nil {
 			b.lg.Fatal("failed to rename tmp database", zap.Error(err))
-		} else {
-			plog.Fatalf("cannot rename database (%s)", err)
 		}
 	}
 
@@ -529,8 +512,6 @@ func (b *backend) defrag() error {
 	if err != nil {
 		if b.lg != nil {
 			b.lg.Fatal("failed to open database", zap.String("path", dbp), zap.Error(err))
-		} else {
-			plog.Panicf("cannot open database at %s (%v)", dbp, err)
 		}
 	}
 	b.batchTx.tx = b.unsafeBegin(true)
@@ -635,8 +616,6 @@ func (b *backend) unsafeBegin(write bool) *bolt.Tx {
 	if err != nil {
 		if b.lg != nil {
 			b.lg.Fatal("failed to begin tx", zap.Error(err))
-		} else {
-			plog.Fatalf("cannot begin tx (%s)", err)
 		}
 	}
 	return tx

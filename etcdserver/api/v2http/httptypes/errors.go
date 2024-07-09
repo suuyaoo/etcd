@@ -17,12 +17,6 @@ package httptypes
 import (
 	"encoding/json"
 	"net/http"
-
-	"github.com/coreos/pkg/capnslog"
-)
-
-var (
-	plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "etcdserver/api/v2http/httptypes")
 )
 
 type HTTPError struct {
@@ -40,7 +34,7 @@ func (e HTTPError) WriteTo(w http.ResponseWriter) error {
 	w.WriteHeader(e.Code)
 	b, err := json.Marshal(e)
 	if err != nil {
-		plog.Panicf("marshal HTTPError should never fail (%v)", err)
+		return err
 	}
 	if _, err := w.Write(b); err != nil {
 		return err

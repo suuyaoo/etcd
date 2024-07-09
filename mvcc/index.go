@@ -213,8 +213,6 @@ func (ti *treeIndex) Compact(rev int64) map[revision]struct{} {
 	available := make(map[revision]struct{})
 	if ti.lg != nil {
 		ti.lg.Info("compact tree index", zap.Int64("revision", rev))
-	} else {
-		plog.Printf("store.index: compact %d", rev)
 	}
 	ti.Lock()
 	clone := ti.tree.Clone()
@@ -231,8 +229,6 @@ func (ti *treeIndex) Compact(rev int64) map[revision]struct{} {
 			if item == nil {
 				if ti.lg != nil {
 					ti.lg.Panic("failed to delete during compaction")
-				} else {
-					plog.Panic("store.index: unexpected delete failure during compaction")
 				}
 			}
 		}

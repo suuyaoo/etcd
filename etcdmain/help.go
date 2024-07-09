@@ -183,8 +183,8 @@ Profiling and Monitoring:
     List of URLs to listen on for the metrics and health endpoints.
 
 Logging:
-  --logger 'capnslog'
-    Specify 'zap' for structured logging or 'capnslog'. [WARN] 'capnslog' will be deprecated in v3.5.
+  --logger 'zap'
+    Specify 'zap' for structured logging.
   --log-outputs 'default'
     Specify 'stdout' or 'stderr' to skip journald logging even when running under systemd, or list of comma separated output targets.
   --log-level 'info'

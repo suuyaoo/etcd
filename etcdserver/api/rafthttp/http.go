@@ -112,8 +112,6 @@ func (h *pipelineHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("local-member-id", h.localID.String()),
 				zap.Error(err),
 			)
-		} else {
-			plog.Errorf("failed to read raft message (%v)", err)
 		}
 		http.Error(w, "error reading raft message", http.StatusBadRequest)
 		recvFailures.WithLabelValues(r.RemoteAddr).Inc()
@@ -128,8 +126,6 @@ func (h *pipelineHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("local-member-id", h.localID.String()),
 				zap.Error(err),
 			)
-		} else {
-			plog.Errorf("failed to unmarshal raft message (%v)", err)
 		}
 		http.Error(w, "error unmarshalling raft message", http.StatusBadRequest)
 		recvFailures.WithLabelValues(r.RemoteAddr).Inc()
@@ -149,8 +145,6 @@ func (h *pipelineHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					zap.String("local-member-id", h.localID.String()),
 					zap.Error(err),
 				)
-			} else {
-				plog.Warningf("failed to process raft message (%v)", err)
 			}
 			http.Error(w, "error processing raft message", http.StatusInternalServerError)
 			w.(http.Flusher).Flush()
@@ -230,8 +224,6 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("remote-snapshot-sender-id", from),
 				zap.Error(err),
 			)
-		} else {
-			plog.Error(msg)
 		}
 		http.Error(w, msg, http.StatusBadRequest)
 		recvFailures.WithLabelValues(r.RemoteAddr).Inc()
@@ -251,8 +243,6 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("remote-snapshot-sender-id", from),
 				zap.String("message-type", m.Type.String()),
 			)
-		} else {
-			plog.Errorf("unexpected raft message type %s on snapshot path", m.Type)
 		}
 		http.Error(w, "wrong raft message type", http.StatusBadRequest)
 		snapshotReceiveFailures.WithLabelValues(from).Inc()
@@ -273,8 +263,6 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			zap.Int("incoming-snapshot-message-size-bytes", msgSizeVal),
 			zap.String("incoming-snapshot-message-size", msgSize),
 		)
-	} else {
-		plog.Infof("receiving database snapshot [index: %d, from: %s, raft message size: %s]", m.Snapshot.Metadata.Index, types.ID(m.From), msgSize)
 	}
 
 	// save incoming database snapshot.
@@ -289,8 +277,6 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.Uint64("incoming-snapshot-index", m.Snapshot.Metadata.Index),
 				zap.Error(err),
 			)
-		} else {
-			plog.Error(msg)
 		}
 		http.Error(w, msg, http.StatusInternalServerError)
 		snapshotReceiveFailures.WithLabelValues(from).Inc()
@@ -311,8 +297,6 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			zap.String("incoming-snapshot-size", dbSize),
 			zap.String("download-took", downloadTook.String()),
 		)
-	} else {
-		plog.Infof("successfully received and saved database snapshot [index: %d, from: %s, raft message size: %s, db size: %s, took: %s]", m.Snapshot.Metadata.Index, types.ID(m.From), msgSize, dbSize, downloadTook.String())
 	}
 
 	if err := h.r.Process(context.TODO(), m); err != nil {
@@ -330,8 +314,6 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					zap.String("remote-snapshot-sender-id", from),
 					zap.Error(err),
 				)
-			} else {
-				plog.Error(msg)
 			}
 			http.Error(w, msg, http.StatusInternalServerError)
 			snapshotReceiveFailures.WithLabelValues(from).Inc()
@@ -384,9 +366,9 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var t streamType
 	switch path.Dir(r.URL.Path) {
-	case streamTypeMsgAppV2.endpoint():
+	case streamTypeMsgAppV2.endpoint(h.lg):
 		t = streamTypeMsgAppV2
-	case streamTypeMessage.endpoint():
+	case streamTypeMessage.endpoint(h.lg):
 		t = streamTypeMessage
 	default:
 		if h.lg != nil {
@@ -396,8 +378,6 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("remote-peer-id-stream-handler", h.id.String()),
 				zap.String("path", r.URL.Path),
 			)
-		} else {
-			plog.Debugf("ignored unexpected streaming request path %s", r.URL.Path)
 		}
 		http.Error(w, "invalid path", http.StatusNotFound)
 		return
@@ -414,8 +394,6 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("path", fromStr),
 				zap.Error(err),
 			)
-		} else {
-			plog.Errorf("failed to parse from %s into ID (%v)", fromStr, err)
 		}
 		http.Error(w, "invalid from", http.StatusNotFound)
 		return
@@ -428,8 +406,6 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("remote-peer-id-stream-handler", h.id.String()),
 				zap.String("remote-peer-id-from", from.String()),
 			)
-		} else {
-			plog.Warningf("rejected the stream from peer %s since it was removed", from)
 		}
 		http.Error(w, "removed member", http.StatusGone)
 		return
@@ -452,8 +428,6 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("remote-peer-id-from", from.String()),
 				zap.String("cluster-id", h.cid.String()),
 			)
-		} else {
-			plog.Errorf("failed to find member %s in cluster %s", from, h.cid)
 		}
 		http.Error(w, "error sender not found", http.StatusNotFound)
 		return
@@ -470,8 +444,6 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				zap.String("remote-peer-id-from", from.String()),
 				zap.String("cluster-id", h.cid.String()),
 			)
-		} else {
-			plog.Errorf("streaming request ignored (ID mismatch got %s want %s)", gto, wto)
 		}
 		http.Error(w, "to field mismatch", http.StatusPreconditionFailed)
 		return
@@ -537,8 +509,6 @@ func checkClusterCompatibilityFromHeader(lg *zap.Logger, localID types.ID, heade
 				zap.String("remote-peer-server-minimum-cluster-version", remoteMinClusterVs),
 				zap.Error(err),
 			)
-		} else {
-			plog.Errorf("request version incompatibility (%v)", err)
 		}
 		return errIncompatibleVersion
 	}
@@ -555,8 +525,6 @@ func checkClusterCompatibilityFromHeader(lg *zap.Logger, localID types.ID, heade
 				zap.String("remote-peer-server-minimum-cluster-version", remoteMinClusterVs),
 				zap.String("remote-peer-cluster-id", gcid),
 			)
-		} else {
-			plog.Errorf("request cluster ID mismatch (got %s want %s)", gcid, cid)
 		}
 		return errClusterIDMismatch
 	}

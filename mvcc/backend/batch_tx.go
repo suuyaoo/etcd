@@ -77,8 +77,6 @@ func (t *batchTx) UnsafeCreateBucket(name []byte) {
 				zap.String("bucket-name", string(name)),
 				zap.Error(err),
 			)
-		} else {
-			plog.Fatalf("cannot create bucket %s (%v)", name, err)
 		}
 	}
 	t.pending++
@@ -102,8 +100,6 @@ func (t *batchTx) unsafePut(bucketName []byte, key []byte, value []byte, seq boo
 				"failed to find a bucket",
 				zap.String("bucket-name", string(bucketName)),
 			)
-		} else {
-			plog.Fatalf("bucket %s does not exist", bucketName)
 		}
 	}
 	if seq {
@@ -118,8 +114,6 @@ func (t *batchTx) unsafePut(bucketName []byte, key []byte, value []byte, seq boo
 				zap.String("bucket-name", string(bucketName)),
 				zap.Error(err),
 			)
-		} else {
-			plog.Fatalf("cannot put key into bucket (%v)", err)
 		}
 	}
 	t.pending++
@@ -134,8 +128,6 @@ func (t *batchTx) UnsafeRange(bucketName, key, endKey []byte, limit int64) ([][]
 				"failed to find a bucket",
 				zap.String("bucket-name", string(bucketName)),
 			)
-		} else {
-			plog.Fatalf("bucket %s does not exist", bucketName)
 		}
 	}
 	return unsafeRange(bucket.Cursor(), key, endKey, limit)
@@ -172,8 +164,6 @@ func (t *batchTx) UnsafeDelete(bucketName []byte, key []byte) {
 				"failed to find a bucket",
 				zap.String("bucket-name", string(bucketName)),
 			)
-		} else {
-			plog.Fatalf("bucket %s does not exist", bucketName)
 		}
 	}
 	err := bucket.Delete(key)
@@ -184,8 +174,6 @@ func (t *batchTx) UnsafeDelete(bucketName []byte, key []byte) {
 				zap.String("bucket-name", string(bucketName)),
 				zap.Error(err),
 			)
-		} else {
-			plog.Fatalf("cannot delete key from bucket (%v)", err)
 		}
 	}
 	t.pending++
@@ -246,8 +234,6 @@ func (t *batchTx) commit(stop bool) {
 		if err != nil {
 			if t.backend.lg != nil {
 				t.backend.lg.Fatal("failed to commit tx", zap.Error(err))
-			} else {
-				plog.Fatalf("cannot commit tx (%s)", err)
 			}
 		}
 	}
@@ -313,8 +299,6 @@ func (t *batchTxBuffered) unsafeCommit(stop bool) {
 			if err := tx.Rollback(); err != nil {
 				if t.backend.lg != nil {
 					t.backend.lg.Fatal("failed to rollback tx", zap.Error(err))
-				} else {
-					plog.Fatalf("cannot rollback tx (%s)", err)
 				}
 			}
 		}(t.backend.readTx.tx, t.backend.readTx.txWg)

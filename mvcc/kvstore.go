@@ -31,7 +31,6 @@ import (
 	"go.etcd.io/etcd/pkg/schedule"
 	"go.etcd.io/etcd/pkg/traceutil"
 
-	"github.com/coreos/pkg/capnslog"
 	"go.uber.org/zap"
 )
 
@@ -47,8 +46,6 @@ var (
 	ErrFutureRev = errors.New("mvcc: required revision is a future revision")
 	ErrCanceled  = errors.New("mvcc: watcher is canceled")
 	ErrClosed    = errors.New("mvcc: closed")
-
-	plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "mvcc")
 )
 
 const (
@@ -391,8 +388,6 @@ func (s *store) restore() error {
 				zap.String("meta-bucket-name-key", string(finishedCompactKeyName)),
 				zap.Int64("restored-compact-revision", s.compactMainRev),
 			)
-		} else {
-			plog.Printf("restore compact to %d", s.compactMainRev)
 		}
 		s.revMu.Unlock()
 	}
@@ -453,8 +448,6 @@ func (s *store) restore() error {
 					zap.String("lease-id", fmt.Sprintf("%016x", lid)),
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("unexpected Attach error: %v", err)
 			}
 		}
 	}
@@ -471,8 +464,6 @@ func (s *store) restore() error {
 				zap.String("meta-bucket-name-key", string(scheduledCompactKeyName)),
 				zap.Int64("scheduled-compact-revision", scheduledCompact),
 			)
-		} else {
-			plog.Printf("resume scheduled compaction at %d", scheduledCompact)
 		}
 	}
 
@@ -536,8 +527,6 @@ func restoreChunk(lg *zap.Logger, kvc chan<- revKeyValue, keys, vals [][]byte, k
 		if err := rkv.kv.Unmarshal(vals[i]); err != nil {
 			if lg != nil {
 				lg.Fatal("failed to unmarshal mvccpb.KeyValue", zap.Error(err))
-			} else {
-				plog.Fatalf("cannot unmarshal event: %v", err)
 			}
 		}
 		rkv.kstr = string(rkv.kv.Key)
@@ -626,8 +615,6 @@ func appendMarkTombstone(lg *zap.Logger, b []byte) []byte {
 				zap.Int("expected-revision-bytes-size", revBytesLen),
 				zap.Int("given-revision-bytes-size", len(b)),
 			)
-		} else {
-			plog.Panicf("cannot append mark to non normal revision bytes")
 		}
 	}
 	return append(b, markTombstone)

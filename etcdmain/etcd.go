@@ -36,16 +36,12 @@ import (
 	"go.etcd.io/etcd/pkg/transport"
 	"go.etcd.io/etcd/pkg/types"
 	"go.etcd.io/etcd/proxy/httpproxy"
-	"go.etcd.io/etcd/version"
 
-	"github.com/coreos/pkg/capnslog"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
 type dirType string
-
-var plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "etcdmain")
 
 var (
 	dirMember = dirType("member")
@@ -64,27 +60,14 @@ func startEtcdOrProxyV2() {
 	if err != nil {
 		if lg != nil {
 			lg.Warn("failed to verify flags", zap.Error(err))
-		} else {
-			plog.Errorf("error verifying flags, %v. See 'etcd --help'.", err)
 		}
 		switch err {
 		case embed.ErrUnsetAdvertiseClientURLsFlag:
 			if lg != nil {
 				lg.Warn("advertise client URLs are not set", zap.Error(err))
-			} else {
-				plog.Errorf("When listening on specific address(es), this etcd process must advertise accessible url(s) to each connected client.")
 			}
 		}
 		os.Exit(1)
-	}
-
-	if lg == nil {
-		// TODO: remove in 3.5
-		plog.Infof("etcd Version: %s\n", version.Version)
-		plog.Infof("Git SHA: %s\n", version.GitSHA)
-		plog.Infof("Go Version: %s\n", runtime.Version())
-		plog.Infof("Go OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
-		plog.Infof("setting maximum number of CPUs to %d, total number of available CPUs is %d", runtime.GOMAXPROCS(0), runtime.NumCPU())
 	}
 
 	defer func() {
@@ -101,15 +84,11 @@ func startEtcdOrProxyV2() {
 				"detected default host for advertise",
 				zap.String("host", defaultHost),
 			)
-		} else {
-			plog.Infof("advertising using detected default host %q", defaultHost)
 		}
 	}
 	if dhErr != nil {
 		if lg != nil {
 			lg.Info("failed to detect default host", zap.Error(dhErr))
-		} else {
-			plog.Noticef("failed to detect default host (%v)", dhErr)
 		}
 	}
 
@@ -120,8 +99,6 @@ func startEtcdOrProxyV2() {
 				"'data-dir' was empty; using default",
 				zap.String("data-dir", cfg.ec.Dir),
 			)
-		} else {
-			plog.Warningf("no data-dir provided, using default data-dir ./%s", cfg.ec.Dir)
 		}
 	}
 
@@ -136,8 +113,6 @@ func startEtcdOrProxyV2() {
 				zap.String("data-dir", cfg.ec.Dir),
 				zap.String("dir-type", string(which)),
 			)
-		} else {
-			plog.Noticef("the server is already initialized as %v before, starting as etcd %v...", which, which)
 		}
 		switch which {
 		case dirMember:
@@ -150,8 +125,6 @@ func startEtcdOrProxyV2() {
 					"unknown directory type",
 					zap.String("dir-type", string(which)),
 				)
-			} else {
-				plog.Panicf("unhandled dir type %v", which)
 			}
 		}
 	} else {
@@ -166,8 +139,6 @@ func startEtcdOrProxyV2() {
 							zap.String("fallback-proxy", fallbackFlagProxy),
 							zap.Error(err),
 						)
-					} else {
-						plog.Noticef("discovery cluster full, falling back to %s", fallbackFlagProxy)
 					}
 					shouldProxy = true
 				}
@@ -199,11 +170,6 @@ func startEtcdOrProxyV2() {
 					)
 					lg.Warn("check data dir if previous bootstrap succeeded")
 					lg.Warn("or use a new discovery token if previous bootstrap failed")
-				} else {
-					plog.Errorf("member %q has previously registered with discovery service token (%s).", cfg.ec.Name, cfg.ec.Durl)
-					plog.Errorf("But etcd could not find valid cluster configuration in the given data dir (%s).", cfg.ec.Dir)
-					plog.Infof("Please check the given data dir path if the previous bootstrap succeeded")
-					plog.Infof("or use a new discovery token if the previous bootstrap failed.")
 				}
 
 			case v2discovery.ErrDuplicateName:
@@ -215,10 +181,6 @@ func startEtcdOrProxyV2() {
 					)
 					lg.Warn("cURL the discovery token URL for details")
 					lg.Warn("do not reuse discovery token; generate a new one to bootstrap a cluster")
-				} else {
-					plog.Errorf("member with duplicated name has registered with discovery service token(%s).", cfg.ec.Durl)
-					plog.Errorf("please check (cURL) the discovery token for more information.")
-					plog.Errorf("please do not reuse the discovery token and generate a new one to bootstrap the cluster.")
 				}
 
 			default:
@@ -229,10 +191,6 @@ func startEtcdOrProxyV2() {
 						zap.Error(err),
 					)
 					lg.Warn("do not reuse discovery token; generate a new one to bootstrap a cluster")
-				} else {
-					plog.Errorf("%v", err)
-					plog.Infof("discovery token %s was used, but failed to bootstrap the cluster.", cfg.ec.Durl)
-					plog.Infof("please generate a new discovery token and try to bootstrap again.")
 				}
 			}
 			os.Exit(1)
@@ -241,55 +199,36 @@ func startEtcdOrProxyV2() {
 		if strings.Contains(err.Error(), "include") && strings.Contains(err.Error(), "--initial-cluster") {
 			if lg != nil {
 				lg.Warn("failed to start", zap.Error(err))
-			} else {
-				plog.Infof("%v", err)
 			}
 			if cfg.ec.InitialCluster == cfg.ec.InitialClusterFromName(cfg.ec.Name) {
 				if lg != nil {
 					lg.Warn("forgot to set --initial-cluster?")
-				} else {
-					plog.Infof("forgot to set --initial-cluster flag?")
 				}
 			}
 			if types.URLs(cfg.ec.AdvertisePeerUrls).String() == embed.DefaultInitialAdvertisePeerURLs {
 				if lg != nil {
 					lg.Warn("forgot to set --initial-advertise-peer-urls?")
-				} else {
-					plog.Infof("forgot to set --initial-advertise-peer-urls flag?")
 				}
 			}
 			if cfg.ec.InitialCluster == cfg.ec.InitialClusterFromName(cfg.ec.Name) && len(cfg.ec.Durl) == 0 {
 				if lg != nil {
 					lg.Warn("--discovery flag is not set")
-				} else {
-					plog.Infof("if you want to use discovery service, please set --discovery flag.")
 				}
 			}
 			os.Exit(1)
 		}
 		if lg != nil {
 			lg.Fatal("discovery failed", zap.Error(err))
-		} else {
-			plog.Fatalf("%v", err)
 		}
 	}
 
 	osutil.HandleInterrupts(lg)
-
-	// At this point, the initialization of etcd is done.
-	// The listeners are listening on the TCP ports and ready
-	// for accepting connections. The etcd instance should be
-	// joined with the cluster and ready to serve incoming
-	// connections.
-	notifySystemd(lg)
 
 	select {
 	case lerr := <-errc:
 		// fatal out on listener errors
 		if lg != nil {
 			lg.Fatal("listener failed", zap.Error(lerr))
-		} else {
-			plog.Fatal(lerr)
 		}
 	case <-stopped:
 	}
@@ -316,8 +255,6 @@ func startProxy(cfg *config) error {
 	lg := cfg.ec.GetLogger()
 	if lg != nil {
 		lg.Info("v2 API proxy starting")
-	} else {
-		plog.Notice("proxy: this proxy supports v2 API only!")
 	}
 
 	clientTLSInfo := cfg.ec.ClientTLSInfo
@@ -343,8 +280,6 @@ func startProxy(cfg *config) error {
 	if err = cfg.ec.PeerSelfCert(); err != nil {
 		if lg != nil {
 			lg.Fatal("failed to get self-signed certs for peer", zap.Error(err))
-		} else {
-			plog.Fatalf("could not get certs (%v)", err)
 		}
 	}
 	tr, err := transport.NewTimeoutTransport(
@@ -358,7 +293,7 @@ func startProxy(cfg *config) error {
 	}
 
 	cfg.ec.Dir = filepath.Join(cfg.ec.Dir, "proxy")
-	err = fileutil.TouchDirAll(cfg.ec.Dir)
+	err = fileutil.TouchDirAll(lg, cfg.ec.Dir)
 	if err != nil {
 		return err
 	}
@@ -375,8 +310,6 @@ func startProxy(cfg *config) error {
 					"discovery token ignored since the proxy has already been initialized; valid cluster file found",
 					zap.String("cluster-file", clusterfile),
 				)
-			} else {
-				plog.Warningf("discovery token ignored since the proxy has already been initialized. Valid cluster file found at %q", clusterfile)
 			}
 		}
 		if cfg.ec.DNSCluster != "" {
@@ -385,8 +318,6 @@ func startProxy(cfg *config) error {
 					"DNS SRV discovery ignored since the proxy has already been initialized; valid cluster file found",
 					zap.String("cluster-file", clusterfile),
 				)
-			} else {
-				plog.Warningf("DNS SRV discovery ignored since the proxy has already been initialized. Valid cluster file found at %q", clusterfile)
 			}
 		}
 		urls := struct{ PeerURLs []string }{}
@@ -401,8 +332,6 @@ func startProxy(cfg *config) error {
 				zap.Strings("peer-urls", peerURLs),
 				zap.String("cluster-file", clusterfile),
 			)
-		} else {
-			plog.Infof("proxy: using peer urls %v from cluster file %q", peerURLs, clusterfile)
 		}
 
 	case os.IsNotExist(err):
@@ -425,8 +354,6 @@ func startProxy(cfg *config) error {
 		peerURLs = urlsmap.URLs()
 		if lg != nil {
 			lg.Info("proxy using peer URLS", zap.Strings("peer-urls", peerURLs))
-		} else {
-			plog.Infof("proxy: using peer urls %v ", peerURLs)
 		}
 
 	default:
@@ -443,8 +370,6 @@ func startProxy(cfg *config) error {
 					zap.Strings("peer-urls", peerURLs),
 					zap.Error(gerr),
 				)
-			} else {
-				plog.Warningf("proxy: %v", gerr)
 			}
 			return []string{}
 		}
@@ -455,8 +380,6 @@ func startProxy(cfg *config) error {
 		if jerr != nil {
 			if lg != nil {
 				lg.Warn("proxy failed to marshal peer URLs", zap.Error(jerr))
-			} else {
-				plog.Warningf("proxy: error on marshal peer urls %s", jerr)
 			}
 			return clientURLs
 		}
@@ -465,8 +388,6 @@ func startProxy(cfg *config) error {
 		if err != nil {
 			if lg != nil {
 				lg.Warn("proxy failed to write cluster file", zap.Error(err))
-			} else {
-				plog.Warningf("proxy: error on writing urls %s", err)
 			}
 			return clientURLs
 		}
@@ -478,8 +399,6 @@ func startProxy(cfg *config) error {
 					zap.String("path", clusterfile),
 					zap.Error(err),
 				)
-			} else {
-				plog.Warningf("proxy: error on updating clusterfile %s", err)
 			}
 			return clientURLs
 		}
@@ -490,15 +409,13 @@ func startProxy(cfg *config) error {
 					zap.Strings("from", peerURLs),
 					zap.Strings("to", gcls.PeerURLs()),
 				)
-			} else {
-				plog.Noticef("proxy: updated peer urls in cluster file from %v to %v", peerURLs, gcls.PeerURLs())
 			}
 		}
 		peerURLs = gcls.PeerURLs()
 
 		return clientURLs
 	}
-	ph := httpproxy.NewHandler(pt, uf, time.Duration(cfg.cp.ProxyFailureWaitMs)*time.Millisecond, time.Duration(cfg.cp.ProxyRefreshIntervalMs)*time.Millisecond)
+	ph := httpproxy.NewHandler(lg, pt, uf, time.Duration(cfg.cp.ProxyFailureWaitMs)*time.Millisecond, time.Duration(cfg.cp.ProxyRefreshIntervalMs)*time.Millisecond)
 	ph = embed.WrapCORS(cfg.ec.CORS, ph)
 
 	if cfg.isReadonlyProxy() {
@@ -521,8 +438,6 @@ func startProxy(cfg *config) error {
 		if err != nil {
 			if lg != nil {
 				lg.Fatal("failed to initialize self-signed client cert", zap.Error(err))
-			} else {
-				plog.Fatalf("proxy: could not initialize self-signed client certs (%v)", err)
 			}
 		}
 	}
@@ -538,13 +453,11 @@ func startProxy(cfg *config) error {
 		go func() {
 			if lg != nil {
 				lg.Info("v2 proxy started listening on client requests", zap.String("host", host))
-			} else {
-				plog.Infof("v2 proxy started listening on client requests on %q", host)
 			}
 			mux := http.NewServeMux()
 			etcdhttp.HandlePrometheus(mux) // v2 proxy just uses the same port
 			mux.Handle("/", ph)
-			plog.Fatal(http.Serve(l, mux))
+			lg.Fatal("", zap.Error(http.Serve(l, mux)))
 		}()
 	}
 	return nil
@@ -560,8 +473,6 @@ func identifyDataDirOrDie(lg *zap.Logger, dir string) dirType {
 		}
 		if lg != nil {
 			lg.Fatal("failed to list data directory", zap.String("dir", dir), zap.Error(err))
-		} else {
-			plog.Fatalf("error listing data dir: %s", dir)
 		}
 	}
 
@@ -579,8 +490,6 @@ func identifyDataDirOrDie(lg *zap.Logger, dir string) dirType {
 					zap.String("filename", name),
 					zap.String("data-dir", dir),
 				)
-			} else {
-				plog.Warningf("found invalid file/dir %s under data dir %s (Ignore this if you are upgrading etcd)", name, dir)
 			}
 		}
 	}
@@ -588,8 +497,6 @@ func identifyDataDirOrDie(lg *zap.Logger, dir string) dirType {
 	if m && p {
 		if lg != nil {
 			lg.Fatal("invalid datadir; both member and proxy directories exist")
-		} else {
-			plog.Fatal("invalid datadir. Both member and proxy directories exist.")
 		}
 	}
 	if m {

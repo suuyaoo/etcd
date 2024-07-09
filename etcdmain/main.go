@@ -18,9 +18,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/coreos/go-systemd/daemon"
-	"go.uber.org/zap"
 )
 
 func Main() {
@@ -44,15 +41,4 @@ func Main() {
 	}
 
 	startEtcdOrProxyV2()
-}
-
-func notifySystemd(lg *zap.Logger) {
-	_, err := daemon.SdNotify(false, daemon.SdNotifyReady)
-	if err != nil {
-		if lg != nil {
-			lg.Error("failed to notify systemd for readiness", zap.Error(err))
-		} else {
-			plog.Errorf("failed to notify systemd for readiness: %v", err)
-		}
-	}
 }

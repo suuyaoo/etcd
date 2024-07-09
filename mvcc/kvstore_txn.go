@@ -160,8 +160,6 @@ func (tr *storeTxnRead) rangeKeys(key, end []byte, curRev int64, ro RangeOptions
 					zap.Int("len-revpairs", len(revpairs)),
 					zap.Int("len-values", len(vs)),
 				)
-			} else {
-				plog.Fatalf("range cannot find rev (%d,%d)", revpair.main, revpair.sub)
 			}
 		}
 		if err := kvs[i].Unmarshal(vs[0]); err != nil {
@@ -170,8 +168,6 @@ func (tr *storeTxnRead) rangeKeys(key, end []byte, curRev int64, ro RangeOptions
 					"failed to unmarshal mvccpb.KeyValue",
 					zap.Error(err),
 				)
-			} else {
-				plog.Fatalf("cannot unmarshal event: %v", err)
 			}
 		}
 	}
@@ -213,8 +209,6 @@ func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 				"failed to marshal mvccpb.KeyValue",
 				zap.Error(err),
 			)
-		} else {
-			plog.Fatalf("cannot marshal event: %v", err)
 		}
 	}
 
@@ -235,8 +229,6 @@ func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 					"failed to detach old lease from a key",
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("unexpected error from lease detach: %v", err)
 			}
 		}
 	}
@@ -288,8 +280,6 @@ func (tw *storeTxnWrite) delete(key []byte) {
 				"failed to marshal mvccpb.KeyValue",
 				zap.Error(err),
 			)
-		} else {
-			plog.Fatalf("cannot marshal event: %v", err)
 		}
 	}
 
@@ -302,8 +292,6 @@ func (tw *storeTxnWrite) delete(key []byte) {
 				zap.String("key", string(key)),
 				zap.Error(err),
 			)
-		} else {
-			plog.Fatalf("cannot tombstone an existing key (%s): %v", string(key), err)
 		}
 	}
 	tw.changes = append(tw.changes, kv)
@@ -319,8 +307,6 @@ func (tw *storeTxnWrite) delete(key []byte) {
 					"failed to detach old lease from a key",
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("cannot detach %v", err)
 			}
 		}
 	}

@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/pkg/capnslog"
 	"go.etcd.io/etcd/etcdserver"
 	"go.etcd.io/etcd/etcdserver/api"
 	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
@@ -76,8 +75,7 @@ func newLogUnaryInterceptor(s *etcdserver.EtcdServer) grpc.UnaryServerIntercepto
 		startTime := time.Now()
 		resp, err := handler(ctx, req)
 		lg := s.Logger()
-		if (lg != nil && lg.Core().Enabled(zap.DebugLevel)) || // using zap logger and debug level is enabled
-			(lg == nil && plog.LevelAt(capnslog.DEBUG)) { // or, using capnslog and debug level is enabled
+		if lg != nil && lg.Core().Enabled(zap.DebugLevel) {
 			defer logUnaryRequestStats(ctx, lg, info, startTime, req, resp)
 		}
 		return resp, err
@@ -165,19 +163,7 @@ func logUnaryRequestStats(ctx context.Context, lg *zap.Logger, info *grpc.UnaryS
 
 func logGenericRequestStats(lg *zap.Logger, startTime time.Time, duration time.Duration, remote string, responseType string,
 	reqCount int64, reqSize int, respCount int64, respSize int, reqContent string) {
-	if lg == nil {
-		plog.Debugf("start time = %v, "+
-			"time spent = %v, "+
-			"remote = %s, "+
-			"response type = %s, "+
-			"request count = %d, "+
-			"request size = %d, "+
-			"response count = %d, "+
-			"response size = %d, "+
-			"request content = %s",
-			startTime, duration, remote, responseType, reqCount, reqSize, respCount, respSize, reqContent,
-		)
-	} else {
+	if lg != nil {
 		lg.Debug("request stats",
 			zap.Time("start time", startTime),
 			zap.Duration("time spent", duration),

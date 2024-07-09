@@ -354,7 +354,7 @@ func (s *v3Manager) saveDB() error {
 		return err
 	}
 
-	if err := fileutil.CreateDirAll(s.snapDir); err != nil {
+	if err := fileutil.CreateDirAll(s.lg, s.snapDir); err != nil {
 		return err
 	}
 
@@ -501,7 +501,7 @@ func (s *v3Manager) unsafeGetLatestRevision(tx backend.BatchTx) (revision, error
 
 // saveWALAndSnap creates a WAL for the initial cluster
 func (s *v3Manager) saveWALAndSnap() error {
-	if err := fileutil.CreateDirAll(s.walDir); err != nil {
+	if err := fileutil.CreateDirAll(s.lg, s.walDir); err != nil {
 		return err
 	}
 

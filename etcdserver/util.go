@@ -125,8 +125,6 @@ func warnOfFailedRequest(lg *zap.Logger, now time.Time, reqStringer fmt.Stringer
 			zap.String("response", resp),
 			zap.Error(err),
 		)
-	} else {
-		plog.Warningf("failed to apply request %q with response %q took (%v) to execute, err is %v", reqStringer.String(), resp, d, err)
 	}
 }
 
@@ -173,14 +171,6 @@ func warnOfExpensiveGenericRequest(lg *zap.Logger, warningApplyDuration time.Dur
 				zap.String("response", resp),
 				zap.Error(err),
 			)
-		} else {
-			var result string
-			if err != nil {
-				result = fmt.Sprintf("error:%v", err)
-			} else {
-				result = resp
-			}
-			plog.Warningf("%srequest %q with result %q took too long (%v) to execute", prefix, reqStringer.String(), result, d)
 		}
 		slowApplies.Inc()
 	}

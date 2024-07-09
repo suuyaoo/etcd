@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/coreos/pkg/capnslog"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.etcd.io/etcd/auth"
@@ -103,8 +102,6 @@ const (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "etcdserver")
-
 	storeMemberAttributeRegexp = regexp.MustCompile(path.Join(membership.StoreMembersPrefix, "[[:xdigit:]]{1,16}", "attributes"))
 )
 
@@ -301,26 +298,22 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 				zap.Int("recommended-request-bytes", recommendedMaxRequestBytes),
 				zap.String("recommended-request-size", humanize.Bytes(uint64(recommendedMaxRequestBytes))),
 			)
-		} else {
-			plog.Warningf("MaxRequestBytes %v exceeds maximum recommended size %v", cfg.MaxRequestBytes, recommendedMaxRequestBytes)
 		}
 	}
 
-	if terr := fileutil.TouchDirAll(cfg.DataDir); terr != nil {
+	if terr := fileutil.TouchDirAll(cfg.Logger, cfg.DataDir); terr != nil {
 		return nil, fmt.Errorf("cannot access data directory: %v", terr)
 	}
 
 	haveWAL := wal.Exist(cfg.WALDir())
 
-	if err = fileutil.TouchDirAll(cfg.SnapDir()); err != nil {
+	if err = fileutil.TouchDirAll(cfg.Logger, cfg.SnapDir()); err != nil {
 		if cfg.Logger != nil {
 			cfg.Logger.Fatal(
 				"failed to create snapshot directory",
 				zap.String("path", cfg.SnapDir()),
 				zap.Error(err),
 			)
-		} else {
-			plog.Fatalf("create snapshot directory error: %v", err)
 		}
 	}
 
@@ -432,8 +425,6 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 					"discovery token is ignored since cluster already initialized; valid logs are found",
 					zap.String("wal-dir", cfg.WALDir()),
 				)
-			} else {
-				plog.Warningf("discovery token ignored since a cluster has already been initialized. Valid log found at %q", cfg.WALDir())
 			}
 		}
 
@@ -453,8 +444,6 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 			if err = st.Recovery(snapshot.Data); err != nil {
 				if cfg.Logger != nil {
 					cfg.Logger.Panic("failed to recover from snapshot")
-				} else {
-					plog.Panicf("recovered store from snapshot error: %v", err)
 				}
 			}
 
@@ -464,15 +453,11 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 					zap.Uint64("snapshot-index", snapshot.Metadata.Index),
 					zap.String("snapshot-size", humanize.Bytes(uint64(snapshot.Size()))),
 				)
-			} else {
-				plog.Infof("recovered store from snapshot at index %d", snapshot.Metadata.Index)
 			}
 
 			if be, err = recoverSnapshotBackend(cfg, be, *snapshot); err != nil {
 				if cfg.Logger != nil {
 					cfg.Logger.Panic("failed to recover v3 backend from snapshot", zap.Error(err))
-				} else {
-					plog.Panicf("recovering backend from snapshot error: %v", err)
 				}
 			}
 			if cfg.Logger != nil {
@@ -505,12 +490,12 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 		return nil, fmt.Errorf("unsupported bootstrap config")
 	}
 
-	if terr := fileutil.TouchDirAll(cfg.MemberDir()); terr != nil {
+	if terr := fileutil.TouchDirAll(cfg.Logger, cfg.MemberDir()); terr != nil {
 		return nil, fmt.Errorf("cannot access member directory: %v", terr)
 	}
 
 	sstats := stats.NewServerStats(cfg.Name, id.String())
-	lstats := stats.NewLeaderStats(id.String())
+	lstats := stats.NewLeaderStats(cfg.Logger, id.String())
 
 	heartbeat := time.Duration(cfg.TickMs) * time.Millisecond
 	srv = &EtcdServer{
@@ -571,8 +556,6 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 	if err != nil {
 		if cfg.Logger != nil {
 			cfg.Logger.Warn("failed to create token provider", zap.Error(err))
-		} else {
-			plog.Warningf("failed to create token provider,err is %v", err)
 		}
 		return nil, err
 	}
@@ -592,8 +575,6 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 					"consistent index was never saved",
 					zap.Uint64("snapshot-index", snapshot.Metadata.Index),
 				)
-			} else {
-				plog.Warningf("consistent index never saved (snapshot index=%d)", snapshot.Metadata.Index)
 			}
 		}
 	}
@@ -687,8 +668,6 @@ func (s *EtcdServer) adjustTicks() {
 				zap.Int("election-ticks", s.Cfg.ElectionTicks),
 				zap.String("election-timeout", tickToDur(s.Cfg.ElectionTicks, s.Cfg.TickMs)),
 			)
-		} else {
-			plog.Infof("%s as single-node; fast-forwarding %d ticks (election ticks %d)", s.ID(), ticks, s.Cfg.ElectionTicks)
 		}
 		s.r.advanceTicks(ticks)
 		return
@@ -735,8 +714,6 @@ func (s *EtcdServer) adjustTicks() {
 					zap.String("election-timeout", tickToDur(s.Cfg.ElectionTicks, s.Cfg.TickMs)),
 					zap.Int("active-remote-members", peerN),
 				)
-			} else {
-				plog.Infof("%s initialized peer connection; fast-forwarding %d ticks (election ticks %d) with %d active peer(s)", s.ID(), ticks, s.Cfg.ElectionTicks, peerN)
 			}
 
 			s.r.advanceTicks(ticks)
@@ -773,8 +750,6 @@ func (s *EtcdServer) start() {
 				zap.Uint64("given-snapshot-count", s.Cfg.SnapshotCount),
 				zap.Uint64("updated-snapshot-count", DefaultSnapshotCount),
 			)
-		} else {
-			plog.Infof("set snapshot count to default %d", DefaultSnapshotCount)
 		}
 		s.Cfg.SnapshotCount = DefaultSnapshotCount
 	}
@@ -807,8 +782,6 @@ func (s *EtcdServer) start() {
 				zap.String("cluster-id", s.Cluster().ID().String()),
 				zap.String("cluster-version", version.Cluster(s.ClusterVersion().String())),
 			)
-		} else {
-			plog.Infof("starting server... [version: %v, cluster version: %v]", version.Version, version.Cluster(s.ClusterVersion().String()))
 		}
 		membership.ClusterVersionMetrics.With(prometheus.Labels{"cluster_version": version.Cluster(s.ClusterVersion().String())}).Set(1)
 	} else {
@@ -819,8 +792,6 @@ func (s *EtcdServer) start() {
 				zap.String("local-server-version", version.Version),
 				zap.String("cluster-version", "to_be_decided"),
 			)
-		} else {
-			plog.Infof("starting server... [version: %v, cluster version: to_be_decided]", version.Version)
 		}
 	}
 
@@ -845,20 +816,14 @@ func (s *EtcdServer) purgeFile() {
 	case e := <-dberrc:
 		if lg != nil {
 			lg.Fatal("failed to purge snap db file", zap.Error(e))
-		} else {
-			plog.Fatalf("failed to purge snap db file %v", e)
 		}
 	case e := <-serrc:
 		if lg != nil {
 			lg.Fatal("failed to purge snap file", zap.Error(e))
-		} else {
-			plog.Fatalf("failed to purge snap file %v", e)
 		}
 	case e := <-werrc:
 		if lg != nil {
 			lg.Fatal("failed to purge wal file", zap.Error(e))
-		} else {
-			plog.Fatalf("failed to purge wal file %v", e)
 		}
 	case <-s.stopping:
 		if dbdonec != nil {
@@ -903,8 +868,6 @@ func (s *EtcdServer) Process(ctx context.Context, m raftpb.Message) error {
 				zap.String("local-member-id", s.ID().String()),
 				zap.String("removed-member-id", types.ID(m.From).String()),
 			)
-		} else {
-			plog.Warningf("reject message from removed member %s", types.ID(m.From).String())
 		}
 		return httptypes.NewHTTPError(http.StatusForbidden, "cannot process message from removed member")
 	}
@@ -948,8 +911,6 @@ func (s *EtcdServer) run() {
 	if err != nil {
 		if lg != nil {
 			lg.Panic("failed to get snapshot from Raft storage", zap.Error(err))
-		} else {
-			plog.Panicf("get snapshot from raft storage error: %v", err)
 		}
 	}
 
@@ -1077,9 +1038,6 @@ func (s *EtcdServer) run() {
 			if lg != nil {
 				lg.Warn("server error", zap.Error(err))
 				lg.Warn("data-dir used by this member must be removed")
-			} else {
-				plog.Errorf("%s", err)
-				plog.Infof("the data-dir used by this member must be removed.")
 			}
 			return
 		case <-getSyncC():
@@ -1117,8 +1075,6 @@ func (s *EtcdServer) revokeExpiredLeases(leases []*lease.Lease) {
 								zap.String("lease-id", fmt.Sprintf("%016x", lid)),
 								zap.Error(lerr),
 							)
-						} else {
-							plog.Warningf("failed to revoke %016x (%q)", lid, lerr.Error())
 						}
 					}
 
@@ -1168,8 +1124,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 			zap.Uint64("incoming-leader-snapshot-index", apply.snapshot.Metadata.Index),
 			zap.Uint64("incoming-leader-snapshot-term", apply.snapshot.Metadata.Term),
 		)
-	} else {
-		plog.Infof("applying snapshot at index %d...", ep.snapi)
 	}
 	defer func() {
 		if lg != nil {
@@ -1180,8 +1134,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 				zap.Uint64("incoming-leader-snapshot-index", apply.snapshot.Metadata.Index),
 				zap.Uint64("incoming-leader-snapshot-term", apply.snapshot.Metadata.Term),
 			)
-		} else {
-			plog.Infof("finished applying incoming snapshot at index %d", ep.snapi)
 		}
 		applySnapshotInProgress.Dec()
 	}()
@@ -1195,9 +1147,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 				zap.Uint64("incoming-leader-snapshot-index", apply.snapshot.Metadata.Index),
 				zap.Uint64("incoming-leader-snapshot-term", apply.snapshot.Metadata.Term),
 			)
-		} else {
-			plog.Panicf("snapshot index [%d] should > appliedi[%d] + 1",
-				apply.snapshot.Metadata.Index, ep.appliedi)
 		}
 	}
 
@@ -1208,8 +1157,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 	if err != nil {
 		if lg != nil {
 			lg.Panic("failed to open snapshot backend", zap.Error(err))
-		} else {
-			plog.Panic(err)
 		}
 	}
 
@@ -1218,38 +1165,28 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 	if s.lessor != nil {
 		if lg != nil {
 			lg.Info("restoring lease store")
-		} else {
-			plog.Info("recovering lessor...")
 		}
 
 		s.lessor.Recover(newbe, func() lease.TxnDelete { return s.kv.Write(traceutil.TODO()) })
 
 		if lg != nil {
 			lg.Info("restored lease store")
-		} else {
-			plog.Info("finished recovering lessor")
 		}
 	}
 
 	if lg != nil {
 		lg.Info("restoring mvcc store")
-	} else {
-		plog.Info("restoring mvcc store...")
 	}
 
 	if err := s.kv.Restore(newbe); err != nil {
 		if lg != nil {
 			lg.Panic("failed to restore mvcc store", zap.Error(err))
-		} else {
-			plog.Panicf("restore KV error: %v", err)
 		}
 	}
 
 	s.consistIndex.setConsistentIndex(s.kv.ConsistentIndex())
 	if lg != nil {
 		lg.Info("restored mvcc store")
-	} else {
-		plog.Info("finished restoring mvcc store")
 	}
 
 	// Closing old backend might block until all the txns
@@ -1260,21 +1197,15 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 	go func() {
 		if lg != nil {
 			lg.Info("closing old backend file")
-		} else {
-			plog.Info("closing old backend...")
 		}
 		defer func() {
 			if lg != nil {
 				lg.Info("closed old backend file")
-			} else {
-				plog.Info("finished closing old backend")
 			}
 		}()
 		if err := oldbe.Close(); err != nil {
 			if lg != nil {
 				lg.Panic("failed to close old backend", zap.Error(err))
-			} else {
-				plog.Panicf("close backend error: %v", err)
 			}
 		}
 	}()
@@ -1284,65 +1215,47 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 
 	if lg != nil {
 		lg.Info("restoring alarm store")
-	} else {
-		plog.Info("recovering alarms...")
 	}
 
 	if err := s.restoreAlarms(); err != nil {
 		if lg != nil {
 			lg.Panic("failed to restore alarm store", zap.Error(err))
-		} else {
-			plog.Panicf("restore alarms error: %v", err)
 		}
 	}
 
 	if lg != nil {
 		lg.Info("restored alarm store")
-	} else {
-		plog.Info("finished recovering alarms")
 	}
 
 	if s.authStore != nil {
 		if lg != nil {
 			lg.Info("restoring auth store")
-		} else {
-			plog.Info("recovering auth store...")
 		}
 
 		s.authStore.Recover(newbe)
 
 		if lg != nil {
 			lg.Info("restored auth store")
-		} else {
-			plog.Info("finished recovering auth store")
 		}
 	}
 
 	if lg != nil {
 		lg.Info("restoring v2 store")
-	} else {
-		plog.Info("recovering store v2...")
 	}
 	if err := s.v2store.Recovery(apply.snapshot.Data); err != nil {
 		if lg != nil {
 			lg.Panic("failed to restore v2 store", zap.Error(err))
-		} else {
-			plog.Panicf("recovery store error: %v", err)
 		}
 	}
 
 	if lg != nil {
 		lg.Info("restored v2 store")
-	} else {
-		plog.Info("finished recovering store v2")
 	}
 
 	s.cluster.SetBackend(newbe)
 
 	if lg != nil {
 		lg.Info("restoring cluster configuration")
-	} else {
-		plog.Info("recovering cluster configuration...")
 	}
 
 	s.cluster.Recover(api.UpdateCapability)
@@ -1350,9 +1263,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 	if lg != nil {
 		lg.Info("restored cluster configuration")
 		lg.Info("removing old peers from network")
-	} else {
-		plog.Info("finished recovering cluster configuration")
-		plog.Info("removing old peers from network...")
 	}
 
 	// recover raft transport
@@ -1361,9 +1271,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 	if lg != nil {
 		lg.Info("removed old peers from network")
 		lg.Info("adding peers from new cluster configuration")
-	} else {
-		plog.Info("finished removing old peers from network")
-		plog.Info("adding peers from new cluster configuration into network...")
 	}
 
 	for _, m := range s.cluster.Members() {
@@ -1375,8 +1282,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 
 	if lg != nil {
 		lg.Info("added peers from new cluster configuration")
-	} else {
-		plog.Info("finished adding peers from new cluster configuration into network...")
 	}
 
 	ep.appliedt = apply.snapshot.Metadata.Term
@@ -1397,8 +1302,6 @@ func (s *EtcdServer) applyEntries(ep *etcdProgress, apply *apply) {
 				zap.Uint64("current-applied-index", ep.appliedi),
 				zap.Uint64("first-committed-entry-index", firsti),
 			)
-		} else {
-			plog.Panicf("first index of committed entry[%d] should <= appliedi[%d] + 1", firsti, ep.appliedi)
 		}
 	}
 	var ents []raftpb.Entry
@@ -1427,8 +1330,6 @@ func (s *EtcdServer) triggerSnapshot(ep *etcdProgress) {
 			zap.Uint64("local-member-snapshot-index", ep.snapi),
 			zap.Uint64("local-member-snapshot-count", s.Cfg.SnapshotCount),
 		)
-	} else {
-		plog.Infof("start to snapshot (applied: %d, lastsnap: %d)", ep.appliedi, ep.snapi)
 	}
 
 	s.snapshot(ep.appliedi, ep.confState)
@@ -1459,8 +1360,6 @@ func (s *EtcdServer) MoveLeader(ctx context.Context, lead, transferee uint64) er
 			zap.String("current-leader-member-id", types.ID(lead).String()),
 			zap.String("transferee-member-id", types.ID(transferee).String()),
 		)
-	} else {
-		plog.Infof("%s starts leadership transfer from %s to %s", s.ID(), types.ID(lead), types.ID(transferee))
 	}
 
 	s.r.TransferLeadership(ctx, lead, transferee)
@@ -1481,8 +1380,6 @@ func (s *EtcdServer) MoveLeader(ctx context.Context, lead, transferee uint64) er
 			zap.String("new-leader-member-id", types.ID(transferee).String()),
 			zap.Duration("took", time.Since(now)),
 		)
-	} else {
-		plog.Infof("%s finished leadership transfer from %s to %s (took %v)", s.ID(), types.ID(lead), types.ID(transferee), time.Since(now))
 	}
 	return nil
 }
@@ -1496,8 +1393,6 @@ func (s *EtcdServer) TransferLeadership() error {
 				zap.String("local-member-id", s.ID().String()),
 				zap.String("current-leader-member-id", types.ID(s.Lead()).String()),
 			)
-		} else {
-			plog.Printf("skipped leadership transfer for stopping non-leader member")
 		}
 		return nil
 	}
@@ -1509,8 +1404,6 @@ func (s *EtcdServer) TransferLeadership() error {
 				zap.String("local-member-id", s.ID().String()),
 				zap.String("current-leader-member-id", types.ID(s.Lead()).String()),
 			)
-		} else {
-			plog.Printf("skipped leadership transfer for single voting member cluster")
 		}
 		return nil
 	}
@@ -1547,8 +1440,6 @@ func (s *EtcdServer) Stop() {
 	if err := s.TransferLeadership(); err != nil {
 		if lg := s.getLogger(); lg != nil {
 			lg.Warn("leadership transfer failed", zap.String("local-member-id", s.ID().String()), zap.Error(err))
-		} else {
-			plog.Warningf("%s failed to transfer leadership (%v)", s.ID(), err)
 		}
 	}
 	s.HardStop()
@@ -1649,8 +1540,6 @@ func (s *EtcdServer) mayAddMember(memb membership.Member) error {
 				zap.String("requested-member-add", fmt.Sprintf("%+v", memb)),
 				zap.Error(ErrNotEnoughStartedMembers),
 			)
-		} else {
-			plog.Warningf("not enough started members, rejecting member add %+v", memb)
 		}
 		return ErrNotEnoughStartedMembers
 	}
@@ -1663,8 +1552,6 @@ func (s *EtcdServer) mayAddMember(memb membership.Member) error {
 				zap.String("requested-member-add", fmt.Sprintf("%+v", memb)),
 				zap.Error(ErrUnhealthy),
 			)
-		} else {
-			plog.Warningf("not healthy for reconfigure, rejecting member add %+v", memb)
 		}
 		return ErrUnhealthy
 	}
@@ -1785,8 +1672,6 @@ func (s *EtcdServer) mayPromoteMember(id types.ID) error {
 				zap.String("requested-member-remove-id", id.String()),
 				zap.Error(ErrNotEnoughStartedMembers),
 			)
-		} else {
-			plog.Warningf("not enough started members, rejecting promote member %s", id)
 		}
 		return ErrNotEnoughStartedMembers
 	}
@@ -1855,8 +1740,6 @@ func (s *EtcdServer) mayRemoveMember(id types.ID) error {
 				zap.String("requested-member-remove-id", id.String()),
 				zap.Error(ErrNotEnoughStartedMembers),
 			)
-		} else {
-			plog.Warningf("not enough started members, rejecting remove member %s", id)
 		}
 		return ErrNotEnoughStartedMembers
 	}
@@ -1878,8 +1761,6 @@ func (s *EtcdServer) mayRemoveMember(id types.ID) error {
 				zap.Int("active-peers", active),
 				zap.Error(ErrUnhealthy),
 			)
-		} else {
-			plog.Warningf("reconfigure breaks active quorum, rejecting remove member %s", id)
 		}
 		return ErrUnhealthy
 	}
@@ -1996,8 +1877,6 @@ func (s *EtcdServer) configure(ctx context.Context, cc raftpb.ConfChange) ([]*me
 		if x == nil {
 			if lg := s.getLogger(); lg != nil {
 				lg.Panic("failed to configure")
-			} else {
-				plog.Panicf("configure trigger value should never be nil")
 			}
 		}
 		resp := x.(*confChangeResponse)
@@ -2055,8 +1934,6 @@ func (s *EtcdServer) publish(timeout time.Duration) {
 	if err != nil {
 		if lg := s.getLogger(); lg != nil {
 			lg.Panic("failed to marshal JSON", zap.Error(err))
-		} else {
-			plog.Panicf("json marshal error: %v", err)
 		}
 		return
 	}
@@ -2082,8 +1959,6 @@ func (s *EtcdServer) publish(timeout time.Duration) {
 					zap.String("cluster-id", s.cluster.ID().String()),
 					zap.Duration("publish-timeout", timeout),
 				)
-			} else {
-				plog.Infof("published %+v to cluster %s", s.attributes, s.cluster.ID())
 			}
 			return
 
@@ -2096,8 +1971,6 @@ func (s *EtcdServer) publish(timeout time.Duration) {
 					zap.Duration("publish-timeout", timeout),
 					zap.Error(err),
 				)
-			} else {
-				plog.Infof("aborting publish because server is stopped")
 			}
 			return
 
@@ -2111,8 +1984,6 @@ func (s *EtcdServer) publish(timeout time.Duration) {
 					zap.Duration("publish-timeout", timeout),
 					zap.Error(err),
 				)
-			} else {
-				plog.Errorf("publish error: %v", err)
 			}
 		}
 	}
@@ -2198,8 +2069,6 @@ func (s *EtcdServer) apply(
 					"unknown entry type; must be either EntryNormal or EntryConfChange",
 					zap.String("type", e.Type.String()),
 				)
-			} else {
-				plog.Panicf("entry type should be either EntryNormal or EntryConfChange")
 			}
 		}
 		appliedi, appliedt = e.Index, e.Term
@@ -2278,8 +2147,6 @@ func (s *EtcdServer) applyEntryNormal(e *raftpb.Entry) {
 			zap.String("quota-size", humanize.Bytes(uint64(s.Cfg.QuotaBackendBytes))),
 			zap.Error(ar.err),
 		)
-	} else {
-		plog.Errorf("applying raft message exceeded backend quota")
 	}
 
 	s.goAttach(func() {
@@ -2319,8 +2186,6 @@ func (s *EtcdServer) applyConfChange(cc raftpb.ConfChange, confState *raftpb.Con
 		if err := json.Unmarshal(cc.Context, confChangeContext); err != nil {
 			if lg != nil {
 				lg.Panic("failed to unmarshal member", zap.Error(err))
-			} else {
-				plog.Panicf("unmarshal member should never fail: %v", err)
 			}
 		}
 		if cc.NodeID != uint64(confChangeContext.Member.ID) {
@@ -2330,8 +2195,6 @@ func (s *EtcdServer) applyConfChange(cc raftpb.ConfChange, confState *raftpb.Con
 					zap.String("member-id-from-config-change-entry", types.ID(cc.NodeID).String()),
 					zap.String("member-id-from-message", confChangeContext.Member.ID.String()),
 				)
-			} else {
-				plog.Panicf("nodeID should always be equal to member ID")
 			}
 		}
 		if confChangeContext.IsPromote {
@@ -2366,8 +2229,6 @@ func (s *EtcdServer) applyConfChange(cc raftpb.ConfChange, confState *raftpb.Con
 		if err := json.Unmarshal(cc.Context, m); err != nil {
 			if lg != nil {
 				lg.Panic("failed to unmarshal member", zap.Error(err))
-			} else {
-				plog.Panicf("unmarshal member should never fail: %v", err)
 			}
 		}
 		if cc.NodeID != uint64(m.ID) {
@@ -2377,8 +2238,6 @@ func (s *EtcdServer) applyConfChange(cc raftpb.ConfChange, confState *raftpb.Con
 					zap.String("member-id-from-config-change-entry", types.ID(cc.NodeID).String()),
 					zap.String("member-id-from-message", m.ID.String()),
 				)
-			} else {
-				plog.Panicf("nodeID should always be equal to member ID")
 			}
 		}
 		s.cluster.UpdateRaftAttributes(m.ID, m.RaftAttributes)
@@ -2409,8 +2268,6 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
 		if err != nil {
 			if lg != nil {
 				lg.Panic("failed to save v2 store", zap.Error(err))
-			} else {
-				plog.Panicf("store save should never fail: %v", err)
 			}
 		}
 		snap, err := s.r.raftStorage.CreateSnapshot(snapi, &confState, d)
@@ -2422,16 +2279,12 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
 			}
 			if lg != nil {
 				lg.Panic("failed to create snapshot", zap.Error(err))
-			} else {
-				plog.Panicf("unexpected create snapshot error %v", err)
 			}
 		}
 		// SaveSnap saves the snapshot to file and appends the corresponding WAL entry.
 		if err = s.r.storage.SaveSnap(snap); err != nil {
 			if lg != nil {
 				lg.Panic("failed to save snapshot", zap.Error(err))
-			} else {
-				plog.Fatalf("save snapshot error: %v", err)
 			}
 		}
 		if lg != nil {
@@ -2439,14 +2292,10 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
 				"saved snapshot",
 				zap.Uint64("snapshot-index", snap.Metadata.Index),
 			)
-		} else {
-			plog.Infof("saved snapshot at index %d", snap.Metadata.Index)
 		}
 		if err = s.r.storage.Release(snap); err != nil {
 			if lg != nil {
 				lg.Panic("failed to release wal", zap.Error(err))
-			} else {
-				plog.Panicf("failed to release wal %v", err)
 			}
 		}
 
@@ -2458,8 +2307,6 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
 		if atomic.LoadInt64(&s.inflightSnapshots) != 0 {
 			if lg != nil {
 				lg.Info("skip compaction since there is an inflight snapshot")
-			} else {
-				plog.Infof("skip compaction since there is an inflight snapshot")
 			}
 			return
 		}
@@ -2479,8 +2326,6 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
 			}
 			if lg != nil {
 				lg.Panic("failed to compact", zap.Error(err))
-			} else {
-				plog.Panicf("unexpected compaction error %v", err)
 			}
 		}
 		if lg != nil {
@@ -2488,8 +2333,6 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
 				"compacted Raft logs",
 				zap.Uint64("compact-index", compacti),
 			)
-		} else {
-			plog.Infof("compacted raft log at %d", compacti)
 		}
 	})
 }
@@ -2576,8 +2419,6 @@ func (s *EtcdServer) updateClusterVersion(ver string) {
 				"setting up initial cluster version",
 				zap.String("cluster-version", version.Cluster(ver)),
 			)
-		} else {
-			plog.Infof("setting up the initial cluster version to %s", version.Cluster(ver))
 		}
 	} else {
 		if lg != nil {
@@ -2586,8 +2427,6 @@ func (s *EtcdServer) updateClusterVersion(ver string) {
 				zap.String("from", version.Cluster(s.cluster.Version().String())),
 				zap.String("to", version.Cluster(ver)),
 			)
-		} else {
-			plog.Infof("updating the cluster version from %s to %s", version.Cluster(s.cluster.Version().String()), version.Cluster(ver))
 		}
 	}
 
@@ -2611,16 +2450,12 @@ func (s *EtcdServer) updateClusterVersion(ver string) {
 	case ErrStopped:
 		if lg != nil {
 			lg.Warn("aborting cluster version update; server is stopped", zap.Error(err))
-		} else {
-			plog.Infof("aborting update cluster version because server is stopped")
 		}
 		return
 
 	default:
 		if lg != nil {
 			lg.Warn("failed to update cluster version", zap.Error(err))
-		} else {
-			plog.Errorf("error updating cluster version (%v)", err)
 		}
 	}
 }
@@ -2669,7 +2504,7 @@ func (s *EtcdServer) AuthStore() auth.AuthStore { return s.authStore }
 
 func (s *EtcdServer) restoreAlarms() error {
 	s.applyV3 = s.newApplierV3()
-	as, err := v3alarm.NewAlarmStore(s)
+	as, err := v3alarm.NewAlarmStore(s.lg, s)
 	if err != nil {
 		return err
 	}
@@ -2692,8 +2527,6 @@ func (s *EtcdServer) goAttach(f func()) {
 	case <-s.stopping:
 		if lg := s.getLogger(); lg != nil {
 			lg.Warn("server has stopped; skipping goAttach")
-		} else {
-			plog.Warning("server has stopped (skipping goAttach)")
 		}
 		return
 	default:

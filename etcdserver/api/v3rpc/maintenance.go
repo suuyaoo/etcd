@@ -80,22 +80,16 @@ func NewMaintenanceServer(s *etcdserver.EtcdServer) pb.MaintenanceServer {
 func (ms *maintenanceServer) Defragment(ctx context.Context, sr *pb.DefragmentRequest) (*pb.DefragmentResponse, error) {
 	if ms.lg != nil {
 		ms.lg.Info("starting defragment")
-	} else {
-		plog.Noticef("starting to defragment the storage backend...")
 	}
 	err := ms.bg.Backend().Defrag()
 	if err != nil {
 		if ms.lg != nil {
 			ms.lg.Warn("failed to defragment", zap.Error(err))
-		} else {
-			plog.Errorf("failed to defragment the storage backend (%v)", err)
 		}
 		return nil, err
 	}
 	if ms.lg != nil {
 		ms.lg.Info("finished defragment")
-	} else {
-		plog.Noticef("finished defragmenting the storage backend")
 	}
 	return &pb.DefragmentResponse{}, nil
 }
@@ -114,8 +108,6 @@ func (ms *maintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance
 		if err := snap.Close(); err != nil {
 			if ms.lg != nil {
 				ms.lg.Warn("failed to close snapshot", zap.Error(err))
-			} else {
-				plog.Errorf("error closing snapshot (%v)", err)
 			}
 		}
 		pw.Close()
@@ -140,8 +132,6 @@ func (ms *maintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance
 			zap.Int64("total-bytes", total),
 			zap.String("size", size),
 		)
-	} else {
-		plog.Infof("sending database snapshot to client %s [%d bytes]", size, total)
 	}
 	for total-sent > 0 {
 		n, err := io.ReadFull(pr, buf)
@@ -178,8 +168,6 @@ func (ms *maintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance
 			zap.Int64("total-bytes", total),
 			zap.Int("checksum-size", len(sha)),
 		)
-	} else {
-		plog.Infof("sending database sha256 checksum to client [%d bytes]", len(sha))
 	}
 
 	hresp := &pb.SnapshotResponse{RemainingBytes: 0, Blob: sha}
@@ -193,8 +181,6 @@ func (ms *maintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance
 			zap.String("size", size),
 			zap.String("took", humanize.Time(start)),
 		)
-	} else {
-		plog.Infof("successfully sent database snapshot to client %s [%d bytes]", size, total)
 	}
 
 	return nil
