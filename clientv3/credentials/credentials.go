@@ -22,7 +22,6 @@ import (
 	"net"
 	"sync"
 
-	"go.etcd.io/etcd/clientv3/balancer/resolver/endpoint"
 	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	grpccredentials "google.golang.org/grpc/credentials"
 )
@@ -95,15 +94,9 @@ func (tc *transportCredential) ClientHandshake(ctx context.Context, authority st
 	dialEp, ok := tc.addrToEndpoint[rawConn.RemoteAddr().String()]
 	tc.mu.Unlock()
 	if ok {
-		_, host, _ := endpoint.ParseEndpoint(dialEp)
-		authority = host
+		authority = dialEp
 	}
 	return tc.gtc.ClientHandshake(ctx, authority, rawConn)
-}
-
-// return true if given string is an IP.
-func isIP(ep string) bool {
-	return net.ParseIP(ep) != nil
 }
 
 func (tc *transportCredential) ServerHandshake(rawConn net.Conn) (net.Conn, grpccredentials.AuthInfo, error) {
@@ -129,17 +122,6 @@ func (tc *transportCredential) Clone() grpccredentials.TransportCredentials {
 
 func (tc *transportCredential) OverrideServerName(serverNameOverride string) error {
 	return tc.gtc.OverrideServerName(serverNameOverride)
-}
-
-func (tc *transportCredential) Dialer(ctx context.Context, dialEp string) (net.Conn, error) {
-	// Keep track of which addresses are dialed for which endpoints
-	conn, err := endpoint.Dialer(ctx, dialEp)
-	if conn != nil {
-		tc.mu.Lock()
-		tc.addrToEndpoint[conn.RemoteAddr().String()] = dialEp
-		tc.mu.Unlock()
-	}
-	return conn, err
 }
 
 // perRPCCredential implements "grpccredentials.PerRPCCredentials" interface.
