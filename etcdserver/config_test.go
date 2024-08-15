@@ -34,32 +34,13 @@ func mustNewURLs(t *testing.T, urls []string) []url.URL {
 	return u
 }
 
-func TestConfigVerifyBootstrapWithoutClusterAndDiscoveryURLFail(t *testing.T) {
+func TestConfigVerifyBootstrapWithoutClusterFail(t *testing.T) {
 	c := &ServerConfig{
 		Name:               "node1",
-		DiscoveryURL:       "",
 		InitialPeerURLsMap: types.URLsMap{},
 		Logger:             zap.NewExample(),
 	}
 	if err := c.VerifyBootstrap(); err == nil {
-		t.Errorf("err = nil, want not nil")
-	}
-}
-
-func TestConfigVerifyExistingWithDiscoveryURLFail(t *testing.T) {
-	cluster, err := types.NewURLsMap("node1=http://127.0.0.1:2380")
-	if err != nil {
-		t.Fatalf("NewCluster error: %v", err)
-	}
-	c := &ServerConfig{
-		Name:               "node1",
-		DiscoveryURL:       "http://127.0.0.1:2379/abcdefg",
-		PeerURLs:           mustNewURLs(t, []string{"http://127.0.0.1:2380"}),
-		InitialPeerURLsMap: cluster,
-		NewCluster:         false,
-		Logger:             zap.NewExample(),
-	}
-	if err := c.VerifyJoinExisting(); err == nil {
 		t.Errorf("err = nil, want not nil")
 	}
 }
@@ -190,23 +171,6 @@ func TestWALDir(t *testing.T) {
 		}
 		if g := cfg.WALDir(); g != w {
 			t.Errorf("DataDir=%q: WALDir()=%q, want=%q", dd, g, w)
-		}
-	}
-}
-
-func TestShouldDiscover(t *testing.T) {
-	tests := map[string]bool{
-		"":                              false,
-		"foo":                           true,
-		"http://discovery.etcd.io/asdf": true,
-	}
-	for durl, w := range tests {
-		cfg := ServerConfig{
-			DiscoveryURL: durl,
-			Logger:       zap.NewExample(),
-		}
-		if g := cfg.ShouldDiscover(); g != w {
-			t.Errorf("durl=%q: ShouldDiscover()=%t, want=%t", durl, g, w)
 		}
 	}
 }

@@ -39,7 +39,6 @@ import (
 	"go.etcd.io/etcd/etcdserver/api/membership"
 	"go.etcd.io/etcd/etcdserver/api/rafthttp"
 	"go.etcd.io/etcd/etcdserver/api/snap"
-	"go.etcd.io/etcd/etcdserver/api/v2discovery"
 	stats "go.etcd.io/etcd/etcdserver/api/v2stats"
 	"go.etcd.io/etcd/etcdserver/api/v2store"
 	"go.etcd.io/etcd/etcdserver/api/v3alarm"
@@ -387,24 +386,6 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 		if isMemberBootstrapped(cfg.Logger, cl, cfg.Name, prt, cfg.bootstrapTimeout()) {
 			return nil, fmt.Errorf("member %s has already been bootstrapped", m.ID)
 		}
-		if cfg.ShouldDiscover() {
-			var str string
-			str, err = v2discovery.JoinCluster(cfg.Logger, cfg.DiscoveryURL, cfg.DiscoveryProxy, m.ID, cfg.InitialPeerURLsMap.String())
-			if err != nil {
-				return nil, &DiscoveryError{Op: "join", Err: err}
-			}
-			var urlsmap types.URLsMap
-			urlsmap, err = types.NewURLsMap(str)
-			if err != nil {
-				return nil, err
-			}
-			if checkDuplicateURL(urlsmap) {
-				return nil, fmt.Errorf("discovery cluster %s has duplicate url", urlsmap)
-			}
-			if cl, err = membership.NewClusterFromURLsMap(cfg.Logger, cfg.InitialClusterToken, urlsmap); err != nil {
-				return nil, err
-			}
-		}
 		cl.SetStore(st)
 		cl.SetBackend(be)
 		id, n, s, w = startNode(cfg, cl, cl.MemberIDs())
@@ -417,15 +398,6 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 
 		if err = fileutil.IsDirWriteable(cfg.WALDir()); err != nil {
 			return nil, fmt.Errorf("cannot write to WAL directory: %v", err)
-		}
-
-		if cfg.ShouldDiscover() {
-			if cfg.Logger != nil {
-				cfg.Logger.Warn(
-					"discovery token is ignored since cluster already initialized; valid logs are found",
-					zap.String("wal-dir", cfg.WALDir()),
-				)
-			}
 		}
 
 		// Find a snapshot to start/restart a raft node

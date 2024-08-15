@@ -62,7 +62,6 @@ func TestEmbedEtcd(t *testing.T) {
 		tests[i].cfg.Debug = false
 	}
 
-	tests[0].cfg.Durl = "abc"
 	setupEmbedCfg(&tests[1].cfg, []url.URL{urls[0]}, []url.URL{urls[1]})
 	tests[1].cfg.AdvertiseClientUrls = nil
 	tests[2].cfg.TickMs = tests[2].cfg.ElectionMs - 1

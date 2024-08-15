@@ -59,57 +59,6 @@ func TestTLSClusterOf3(t *testing.T) {
 	clusterMustProgress(t, c.Members)
 }
 
-func TestClusterOf1UsingDiscovery(t *testing.T) { testClusterUsingDiscovery(t, 1) }
-func TestClusterOf3UsingDiscovery(t *testing.T) { testClusterUsingDiscovery(t, 3) }
-
-func testClusterUsingDiscovery(t *testing.T, size int) {
-	defer testutil.AfterTest(t)
-	dc := NewCluster(t, 1)
-	dc.Launch(t)
-	defer dc.Terminate(t)
-	// init discovery token space
-	dcc := MustNewHTTPClient(t, dc.URLs(), nil)
-	dkapi := client.NewKeysAPI(dcc)
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	if _, err := dkapi.Create(ctx, "/_config/size", fmt.Sprintf("%d", size)); err != nil {
-		t.Fatal(err)
-	}
-	cancel()
-
-	c := NewClusterByConfig(
-		t,
-		&ClusterConfig{Size: size, DiscoveryURL: dc.URL(0) + "/v2/keys"},
-	)
-	c.Launch(t)
-	defer c.Terminate(t)
-	clusterMustProgress(t, c.Members)
-}
-
-func TestTLSClusterOf3UsingDiscovery(t *testing.T) {
-	defer testutil.AfterTest(t)
-	dc := NewCluster(t, 1)
-	dc.Launch(t)
-	defer dc.Terminate(t)
-	// init discovery token space
-	dcc := MustNewHTTPClient(t, dc.URLs(), nil)
-	dkapi := client.NewKeysAPI(dcc)
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	if _, err := dkapi.Create(ctx, "/_config/size", fmt.Sprintf("%d", 3)); err != nil {
-		t.Fatal(err)
-	}
-	cancel()
-
-	c := NewClusterByConfig(t,
-		&ClusterConfig{
-			Size:         3,
-			PeerTLS:      &testTLSInfo,
-			DiscoveryURL: dc.URL(0) + "/v2/keys"},
-	)
-	c.Launch(t)
-	defer c.Terminate(t)
-	clusterMustProgress(t, c.Members)
-}
-
 func TestDoubleClusterSizeOf1(t *testing.T) { testDoubleClusterSize(t, 1) }
 func TestDoubleClusterSizeOf3(t *testing.T) { testDoubleClusterSize(t, 3) }
 

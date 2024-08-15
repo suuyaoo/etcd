@@ -42,9 +42,6 @@ var (
 	proxyFlagReadonly = "readonly"
 	proxyFlagOn       = "on"
 
-	fallbackFlagExit  = "exit"
-	fallbackFlagProxy = "proxy"
-
 	ignored = []string{
 		"cluster-active-size",
 		"cluster-remove-delay",
@@ -71,10 +68,8 @@ type configProxy struct {
 	ProxyDialTimeoutMs     uint `json:"proxy-dial-timeout"`
 	ProxyWriteTimeoutMs    uint `json:"proxy-write-timeout"`
 	ProxyReadTimeoutMs     uint `json:"proxy-read-timeout"`
-	Fallback               string
 	Proxy                  string
 	ProxyJSON              string `json:"proxy"`
-	FallbackJSON           string `json:"discovery-fallback"`
 }
 
 // config holds the config for a command line invocation of etcd
@@ -91,7 +86,6 @@ type config struct {
 type configFlags struct {
 	flagSet      *flag.FlagSet
 	clusterState *flags.SelectiveStringValue
-	fallback     *flags.SelectiveStringValue
 	proxy        *flags.SelectiveStringValue
 }
 
@@ -112,10 +106,6 @@ func newConfig() *config {
 		clusterState: flags.NewSelectiveStringValue(
 			embed.ClusterStateFlagNew,
 			embed.ClusterStateFlagExisting,
-		),
-		fallback: flags.NewSelectiveStringValue(
-			fallbackFlagProxy,
-			fallbackFlagExit,
 		),
 		proxy: flags.NewSelectiveStringValue(
 			proxyFlagOff,
@@ -181,12 +171,7 @@ func newConfig() *config {
 		"advertise-client-urls",
 		"List of this member's client URLs to advertise to the public.",
 	)
-	fs.StringVar(&cfg.ec.Durl, "discovery", cfg.ec.Durl, "Discovery URL used to bootstrap the cluster.")
-	fs.Var(cfg.cf.fallback, "discovery-fallback", fmt.Sprintf("Valid values include %q", cfg.cf.fallback.Valids()))
 
-	fs.StringVar(&cfg.ec.Dproxy, "discovery-proxy", cfg.ec.Dproxy, "HTTP proxy to use for traffic to discovery service.")
-	fs.StringVar(&cfg.ec.DNSCluster, "discovery-srv", cfg.ec.DNSCluster, "DNS domain used to bootstrap initial cluster.")
-	fs.StringVar(&cfg.ec.DNSClusterServiceName, "discovery-srv-name", cfg.ec.DNSClusterServiceName, "Service name to query when using DNS discovery.")
 	fs.StringVar(&cfg.ec.InitialCluster, "initial-cluster", cfg.ec.InitialCluster, "Initial cluster configuration for bootstrapping.")
 	fs.StringVar(&cfg.ec.InitialClusterToken, "initial-cluster-token", cfg.ec.InitialClusterToken, "Initial cluster token for the etcd cluster during bootstrap.")
 	fs.Var(cfg.cf.clusterState, "initial-cluster-state", "Initial cluster state ('new' when bootstrapping a new cluster or 'existing' when adding new members to an existing cluster). After successful initialization (bootstrapping or adding), flag is ignored on restarts.")
@@ -350,7 +335,6 @@ func (cfg *config) configFromCmdLine() error {
 	cfg.ec.LogOutputs = flags.UniqueStringsFromFlag(cfg.cf.flagSet, "log-outputs")
 
 	cfg.ec.ClusterState = cfg.cf.clusterState.String()
-	cfg.cp.Fallback = cfg.cf.fallback.String()
 	cfg.cp.Proxy = cfg.cf.proxy.String()
 
 	// disable default advertise-client-urls if lcurls is set
@@ -360,7 +344,7 @@ func (cfg *config) configFromCmdLine() error {
 	}
 
 	// disable default initial-cluster if discovery is set
-	if (cfg.ec.Durl != "" || cfg.ec.DNSCluster != "" || cfg.ec.DNSClusterServiceName != "") && !flags.IsSet(cfg.cf.flagSet, "initial-cluster") {
+	if !flags.IsSet(cfg.cf.flagSet, "initial-cluster") {
 		cfg.ec.InitialCluster = ""
 	}
 
@@ -391,13 +375,6 @@ func (cfg *config) configFromFile(path string) error {
 		cfg.ec.ListenMetricsUrls = []url.URL(us)
 	}
 
-	if cfg.cp.FallbackJSON != "" {
-		if err := cfg.cf.fallback.Set(cfg.cp.FallbackJSON); err != nil {
-			log.Fatalf("unexpected error setting up discovery-fallback flag: %v", err)
-		}
-		cfg.cp.Fallback = cfg.cf.fallback.String()
-	}
-
 	if cfg.cp.ProxyJSON != "" {
 		if err := cfg.cf.proxy.Set(cfg.cp.ProxyJSON); err != nil {
 			log.Fatalf("unexpected error setting up proxyFlag: %v", err)
@@ -408,19 +385,16 @@ func (cfg *config) configFromFile(path string) error {
 }
 
 func (cfg *config) mayBeProxy() bool {
-	mayFallbackToProxy := cfg.ec.Durl != "" && cfg.cp.Fallback == fallbackFlagProxy
-	return cfg.cp.Proxy != proxyFlagOff || mayFallbackToProxy
+	return cfg.cp.Proxy != proxyFlagOff
 }
 
 func (cfg *config) validate() error {
 	err := cfg.ec.Validate()
-	// TODO(yichengq): check this for joining through discovery service case
 	if err == embed.ErrUnsetAdvertiseClientURLsFlag && cfg.mayBeProxy() {
 		return nil
 	}
 	return err
 }
 
-func (cfg config) isProxy() bool               { return cfg.cf.proxy.String() != proxyFlagOff }
-func (cfg config) isReadonlyProxy() bool       { return cfg.cf.proxy.String() == proxyFlagReadonly }
-func (cfg config) shouldFallbackToProxy() bool { return cfg.cf.fallback.String() == fallbackFlagProxy }
+func (cfg config) isProxy() bool         { return cfg.cf.proxy.String() != proxyFlagOff }
+func (cfg config) isReadonlyProxy() bool { return cfg.cf.proxy.String() == proxyFlagReadonly }

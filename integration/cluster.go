@@ -122,8 +122,6 @@ type ClusterConfig struct {
 	PeerTLS   *transport.TLSInfo
 	ClientTLS *transport.TLSInfo
 
-	DiscoveryURL string
-
 	AuthToken string
 
 	UseGRPC bool
@@ -169,11 +167,6 @@ func schemeFromTLSInfo(tls *transport.TLSInfo) string {
 }
 
 func (c *cluster) fillClusterForMembers() error {
-	if c.cfg.DiscoveryURL != "" {
-		// cluster will be discovered
-		return nil
-	}
-
 	addrs := make([]string, 0)
 	for _, m := range c.Members {
 		scheme := schemeFromTLSInfo(m.PeerTLSInfo)
@@ -302,7 +295,6 @@ func (c *cluster) mustNewMember(t testing.TB) *member {
 			WatchProgressNotifyInterval: c.cfg.WatchProgressNotifyInterval,
 			CorruptCheckTime:            c.cfg.CorruptCheckTime,
 		})
-	m.DiscoveryURL = c.cfg.DiscoveryURL
 	if c.cfg.UseGRPC {
 		if err := m.listenGRPC(); err != nil {
 			t.Fatal(err)
