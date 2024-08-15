@@ -18,6 +18,16 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/spf13/cobra"
+)
+
+var (
+	rootCmd = &cobra.Command{
+		Use:        "etcd",
+		Short:      "etcd server",
+		SuggestFor: []string{"etcd"},
+	}
 )
 
 func Main() {

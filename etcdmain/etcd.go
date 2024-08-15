@@ -15,27 +15,17 @@
 package etcdmain
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
-	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
-	"time"
 
 	"go.etcd.io/etcd/embed"
 	"go.etcd.io/etcd/etcdserver"
-	"go.etcd.io/etcd/etcdserver/api/etcdhttp"
 	"go.etcd.io/etcd/etcdserver/api/v2discovery"
 	"go.etcd.io/etcd/pkg/fileutil"
-	pkgioutil "go.etcd.io/etcd/pkg/ioutil"
 	"go.etcd.io/etcd/pkg/osutil"
-	"go.etcd.io/etcd/pkg/transport"
 	"go.etcd.io/etcd/pkg/types"
-	"go.etcd.io/etcd/proxy/httpproxy"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -117,8 +107,6 @@ func startEtcdOrProxyV2() {
 		switch which {
 		case dirMember:
 			stopped, errc, err = startEtcd(&cfg.ec)
-		case dirProxy:
-			err = startProxy(cfg)
 		default:
 			if lg != nil {
 				lg.Panic(
@@ -147,9 +135,6 @@ func startEtcdOrProxyV2() {
 					lg.Warn("failed to start etcd", zap.Error(err))
 				}
 			}
-		}
-		if shouldProxy {
-			err = startProxy(cfg)
 		}
 	}
 
@@ -248,219 +233,6 @@ func startEtcd(cfg *embed.Config) (<-chan struct{}, <-chan error, error) {
 	case <-e.Server.StopNotify(): // publish aborted from 'ErrStopped'
 	}
 	return e.Server.StopNotify(), e.Err(), nil
-}
-
-// startProxy launches an HTTP proxy for client communication which proxies to other etcd nodes.
-func startProxy(cfg *config) error {
-	lg := cfg.ec.GetLogger()
-	if lg != nil {
-		lg.Info("v2 API proxy starting")
-	}
-
-	clientTLSInfo := cfg.ec.ClientTLSInfo
-	if clientTLSInfo.Empty() {
-		// Support old proxy behavior of defaulting to PeerTLSInfo
-		// for both client and peer connections.
-		clientTLSInfo = cfg.ec.PeerTLSInfo
-	}
-	clientTLSInfo.InsecureSkipVerify = cfg.ec.ClientAutoTLS
-	cfg.ec.PeerTLSInfo.InsecureSkipVerify = cfg.ec.PeerAutoTLS
-
-	pt, err := transport.NewTimeoutTransport(
-		clientTLSInfo,
-		time.Duration(cfg.cp.ProxyDialTimeoutMs)*time.Millisecond,
-		time.Duration(cfg.cp.ProxyReadTimeoutMs)*time.Millisecond,
-		time.Duration(cfg.cp.ProxyWriteTimeoutMs)*time.Millisecond,
-	)
-	if err != nil {
-		return err
-	}
-	pt.MaxIdleConnsPerHost = httpproxy.DefaultMaxIdleConnsPerHost
-
-	if err = cfg.ec.PeerSelfCert(); err != nil {
-		if lg != nil {
-			lg.Fatal("failed to get self-signed certs for peer", zap.Error(err))
-		}
-	}
-	tr, err := transport.NewTimeoutTransport(
-		cfg.ec.PeerTLSInfo,
-		time.Duration(cfg.cp.ProxyDialTimeoutMs)*time.Millisecond,
-		time.Duration(cfg.cp.ProxyReadTimeoutMs)*time.Millisecond,
-		time.Duration(cfg.cp.ProxyWriteTimeoutMs)*time.Millisecond,
-	)
-	if err != nil {
-		return err
-	}
-
-	cfg.ec.Dir = filepath.Join(cfg.ec.Dir, "proxy")
-	err = fileutil.TouchDirAll(lg, cfg.ec.Dir)
-	if err != nil {
-		return err
-	}
-
-	var peerURLs []string
-	clusterfile := filepath.Join(cfg.ec.Dir, "cluster")
-
-	b, err := ioutil.ReadFile(clusterfile)
-	switch {
-	case err == nil:
-		if cfg.ec.Durl != "" {
-			if lg != nil {
-				lg.Warn(
-					"discovery token ignored since the proxy has already been initialized; valid cluster file found",
-					zap.String("cluster-file", clusterfile),
-				)
-			}
-		}
-		if cfg.ec.DNSCluster != "" {
-			if lg != nil {
-				lg.Warn(
-					"DNS SRV discovery ignored since the proxy has already been initialized; valid cluster file found",
-					zap.String("cluster-file", clusterfile),
-				)
-			}
-		}
-		urls := struct{ PeerURLs []string }{}
-		err = json.Unmarshal(b, &urls)
-		if err != nil {
-			return err
-		}
-		peerURLs = urls.PeerURLs
-		if lg != nil {
-			lg.Info(
-				"proxy using peer URLS from cluster file",
-				zap.Strings("peer-urls", peerURLs),
-				zap.String("cluster-file", clusterfile),
-			)
-		}
-
-	case os.IsNotExist(err):
-		var urlsmap types.URLsMap
-		urlsmap, _, err = cfg.ec.PeerURLsMapAndToken("proxy")
-		if err != nil {
-			return fmt.Errorf("error setting up initial cluster: %v", err)
-		}
-
-		if cfg.ec.Durl != "" {
-			var s string
-			s, err = v2discovery.GetCluster(lg, cfg.ec.Durl, cfg.ec.Dproxy)
-			if err != nil {
-				return err
-			}
-			if urlsmap, err = types.NewURLsMap(s); err != nil {
-				return err
-			}
-		}
-		peerURLs = urlsmap.URLs()
-		if lg != nil {
-			lg.Info("proxy using peer URLS", zap.Strings("peer-urls", peerURLs))
-		}
-
-	default:
-		return err
-	}
-
-	clientURLs := []string{}
-	uf := func() []string {
-		gcls, gerr := etcdserver.GetClusterFromRemotePeers(lg, peerURLs, tr)
-		if gerr != nil {
-			if lg != nil {
-				lg.Warn(
-					"failed to get cluster from remote peers",
-					zap.Strings("peer-urls", peerURLs),
-					zap.Error(gerr),
-				)
-			}
-			return []string{}
-		}
-
-		clientURLs = gcls.ClientURLs()
-		urls := struct{ PeerURLs []string }{gcls.PeerURLs()}
-		b, jerr := json.Marshal(urls)
-		if jerr != nil {
-			if lg != nil {
-				lg.Warn("proxy failed to marshal peer URLs", zap.Error(jerr))
-			}
-			return clientURLs
-		}
-
-		err = pkgioutil.WriteAndSyncFile(clusterfile+".bak", b, 0600)
-		if err != nil {
-			if lg != nil {
-				lg.Warn("proxy failed to write cluster file", zap.Error(err))
-			}
-			return clientURLs
-		}
-		err = os.Rename(clusterfile+".bak", clusterfile)
-		if err != nil {
-			if lg != nil {
-				lg.Warn(
-					"proxy failed to rename cluster file",
-					zap.String("path", clusterfile),
-					zap.Error(err),
-				)
-			}
-			return clientURLs
-		}
-		if !reflect.DeepEqual(gcls.PeerURLs(), peerURLs) {
-			if lg != nil {
-				lg.Info(
-					"proxy updated peer URLs",
-					zap.Strings("from", peerURLs),
-					zap.Strings("to", gcls.PeerURLs()),
-				)
-			}
-		}
-		peerURLs = gcls.PeerURLs()
-
-		return clientURLs
-	}
-	ph := httpproxy.NewHandler(lg, pt, uf, time.Duration(cfg.cp.ProxyFailureWaitMs)*time.Millisecond, time.Duration(cfg.cp.ProxyRefreshIntervalMs)*time.Millisecond)
-	ph = embed.WrapCORS(cfg.ec.CORS, ph)
-
-	if cfg.isReadonlyProxy() {
-		ph = httpproxy.NewReadonlyHandler(ph)
-	}
-
-	// setup self signed certs when serving https
-	cHosts, cTLS := []string{}, false
-	for _, u := range cfg.ec.ListenClientUrls {
-		cHosts = append(cHosts, u.Host)
-		cTLS = cTLS || u.Scheme == "https"
-	}
-	for _, u := range cfg.ec.AdvertiseClientUrls {
-		cHosts = append(cHosts, u.Host)
-		cTLS = cTLS || u.Scheme == "https"
-	}
-	listenerTLS := cfg.ec.ClientTLSInfo
-	if cfg.ec.ClientAutoTLS && cTLS {
-		listenerTLS, err = transport.SelfCert(cfg.ec.GetLogger(), filepath.Join(cfg.ec.Dir, "clientCerts"), cHosts)
-		if err != nil {
-			if lg != nil {
-				lg.Fatal("failed to initialize self-signed client cert", zap.Error(err))
-			}
-		}
-	}
-
-	// Start a proxy server goroutine for each listen address
-	for _, u := range cfg.ec.ListenClientUrls {
-		l, err := transport.NewListener(u.Host, u.Scheme, &listenerTLS)
-		if err != nil {
-			return err
-		}
-
-		host := u.String()
-		go func() {
-			if lg != nil {
-				lg.Info("v2 proxy started listening on client requests", zap.String("host", host))
-			}
-			mux := http.NewServeMux()
-			etcdhttp.HandlePrometheus(mux) // v2 proxy just uses the same port
-			mux.Handle("/", ph)
-			lg.Fatal("", zap.Error(http.Serve(l, mux)))
-		}()
-	}
-	return nil
 }
 
 // identifyDataDirOrDie returns the type of the data dir.
