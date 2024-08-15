@@ -34,9 +34,6 @@ import (
 	"go.etcd.io/etcd/etcdserver"
 	"go.etcd.io/etcd/etcdserver/api/etcdhttp"
 	"go.etcd.io/etcd/etcdserver/api/rafthttp"
-	"go.etcd.io/etcd/etcdserver/api/v2http"
-	"go.etcd.io/etcd/etcdserver/api/v2v3"
-	"go.etcd.io/etcd/etcdserver/api/v3client"
 	"go.etcd.io/etcd/etcdserver/api/v3rpc"
 	"go.etcd.io/etcd/pkg/debugutil"
 	runtimeutil "go.etcd.io/etcd/pkg/runtime"
@@ -709,18 +706,10 @@ func (e *Etcd) serveClients() (err error) {
 
 	// Start a client server goroutine for each listen address
 	var h http.Handler
-	if e.Config().EnableV2 {
-		if len(e.Config().ExperimentalEnableV2V3) > 0 {
-			srv := v2v3.NewServer(e.cfg.logger, v3client.New(e.Server), e.cfg.ExperimentalEnableV2V3)
-			h = v2http.NewClientHandler(e.GetLogger(), srv, e.Server.Cfg.ReqTimeout())
-		} else {
-			h = v2http.NewClientHandler(e.GetLogger(), e.Server, e.Server.Cfg.ReqTimeout())
-		}
-	} else {
-		mux := http.NewServeMux()
-		etcdhttp.HandleBasic(e.cfg.logger, mux, e.Server)
-		h = mux
-	}
+
+	mux := http.NewServeMux()
+	etcdhttp.HandleBasic(e.cfg.logger, mux, e.Server)
+	h = mux
 
 	gopts := []grpc.ServerOption{}
 	if e.cfg.GRPCKeepAliveMinTime > time.Duration(0) {

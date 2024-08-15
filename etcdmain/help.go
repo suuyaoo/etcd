@@ -121,8 +121,6 @@ Clustering:
     Auto compaction retention length. 0 means disable auto compaction.
   --auto-compaction-mode 'periodic'
     Interpret 'auto-compaction-retention' one of: periodic|revision. 'periodic' for duration based retention, defaulting to hours if no time unit is provided (e.g. '5m'). 'revision' for revision number based retention.
-  --enable-v2 '` + strconv.FormatBool(embed.DefaultEnableV2) + `'
-    Accept etcd V2 client requests.
 
 Security:
   --cert-file ''
@@ -209,8 +207,6 @@ Experimental feature:
     Enable to check data corruption before serving any client/peer traffic.
   --experimental-corrupt-check-time '0s'
     Duration of time between cluster corruption check passes.
-  --experimental-enable-v2v3 ''
-    Serve v2 requests through the v3 backend under a given prefix.
   --experimental-backend-bbolt-freelist-type 'array'
     ExperimentalBackendFreelistType specifies the type of freelist that boltdb backend uses(array and map are supported types).
   --experimental-enable-lease-checkpoint 'false'
