@@ -22,8 +22,8 @@ import (
 
 	"go.etcd.io/etcd/etcdserver"
 	"go.etcd.io/etcd/etcdserver/api"
+	httptypes "go.etcd.io/etcd/etcdserver/api/etcdhttp/types"
 	"go.etcd.io/etcd/etcdserver/api/v2error"
-	"go.etcd.io/etcd/etcdserver/api/v2http/httptypes"
 	"go.etcd.io/etcd/version"
 
 	"go.uber.org/zap"

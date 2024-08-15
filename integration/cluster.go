@@ -39,7 +39,6 @@ import (
 	"go.etcd.io/etcd/etcdserver"
 	"go.etcd.io/etcd/etcdserver/api/etcdhttp"
 	"go.etcd.io/etcd/etcdserver/api/rafthttp"
-	"go.etcd.io/etcd/etcdserver/api/v2http"
 	"go.etcd.io/etcd/etcdserver/api/v3client"
 	"go.etcd.io/etcd/etcdserver/api/v3election"
 	epb "go.etcd.io/etcd/etcdserver/api/v3election/v3electionpb"
@@ -49,7 +48,6 @@ import (
 	pb "go.etcd.io/etcd/etcdserver/etcdserverpb"
 	"go.etcd.io/etcd/pkg/logutil"
 	"go.etcd.io/etcd/pkg/testutil"
-	"go.etcd.io/etcd/pkg/tlsutil"
 	"go.etcd.io/etcd/pkg/transport"
 	"go.etcd.io/etcd/pkg/types"
 
@@ -895,69 +893,6 @@ func (m *member) Launch() error {
 			hs.CloseClientConnections()
 			hs.Close()
 			<-donec
-		}
-		m.serverClosers = append(m.serverClosers, closer)
-	}
-	for _, ln := range m.ClientListeners {
-		hs := &httptest.Server{
-			Listener: ln,
-			Config: &http.Server{
-				Handler: v2http.NewClientHandler(
-					m.Logger,
-					m.s,
-					m.ServerConfig.ReqTimeout(),
-				),
-				ErrorLog: log.New(ioutil.Discard, "net/http", 0),
-			},
-		}
-		if m.ClientTLSInfo == nil {
-			hs.Start()
-		} else {
-			info := m.ClientTLSInfo
-			hs.TLS, err = info.ServerConfig()
-			if err != nil {
-				return err
-			}
-
-			// baseConfig is called on initial TLS handshake start.
-			//
-			// Previously,
-			// 1. Server has non-empty (*tls.Config).Certificates on client hello
-			// 2. Server calls (*tls.Config).GetCertificate iff:
-			//    - Server's (*tls.Config).Certificates is not empty, or
-			//    - Client supplies SNI; non-empty (*tls.ClientHelloInfo).ServerName
-			//
-			// When (*tls.Config).Certificates is always populated on initial handshake,
-			// client is expected to provide a valid matching SNI to pass the TLS
-			// verification, thus trigger server (*tls.Config).GetCertificate to reload
-			// TLS assets. However, a cert whose SAN field does not include domain names
-			// but only IP addresses, has empty (*tls.ClientHelloInfo).ServerName, thus
-			// it was never able to trigger TLS reload on initial handshake; first
-			// ceritifcate object was being used, never being updated.
-			//
-			// Now, (*tls.Config).Certificates is created empty on initial TLS client
-			// handshake, in order to trigger (*tls.Config).GetCertificate and populate
-			// rest of the certificates on every new TLS connection, even when client
-			// SNI is empty (e.g. cert only includes IPs).
-			//
-			// This introduces another problem with "httptest.Server":
-			// when server initial certificates are empty, certificates
-			// are overwritten by Go's internal test certs, which have
-			// different SAN fields (e.g. example.com). To work around,
-			// re-overwrite (*tls.Config).Certificates before starting
-			// test server.
-			tlsCert, err := tlsutil.NewCert(info.CertFile, info.KeyFile, nil)
-			if err != nil {
-				return err
-			}
-			hs.TLS.Certificates = []tls.Certificate{*tlsCert}
-
-			hs.StartTLS()
-		}
-		closer := func() {
-			ln.Close()
-			hs.CloseClientConnections()
-			hs.Close()
 		}
 		m.serverClosers = append(m.serverClosers, closer)
 	}
