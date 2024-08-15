@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -81,6 +82,33 @@ type Client struct {
 	callOpts []grpc.CallOption
 
 	lg *zap.Logger
+}
+
+// ParseEndpoint endpoint parses an endpoint of the form
+// (http|https)://<host>*|(unix|unixs)://<path>)
+// and returns a protocol ('tcp' or 'unix'),
+// host (or filepath if a unix socket),
+// scheme (http, https, unix, unixs).
+func ParseEndpoint(endpoint string) (proto string, host string, scheme string) {
+	proto = "tcp"
+	host = endpoint
+	url, uerr := url.Parse(endpoint)
+	if uerr != nil || !strings.Contains(endpoint, "://") {
+		return proto, host, scheme
+	}
+	scheme = url.Scheme
+
+	// strip scheme:// prefix since grpc dials by host
+	host = url.Host
+	switch url.Scheme {
+	case "http", "https":
+	case "unix", "unixs":
+		proto = "unix"
+		host = url.Host + url.Path
+	default:
+		proto, host = "", ""
+	}
+	return proto, host, scheme
 }
 
 // New creates a new etcdv3 client from a given configuration.
@@ -149,8 +177,30 @@ func (c *Client) SetEndpoints(eps ...string) {
 
 // Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
 func (c *Client) Sync(ctx context.Context) error {
-	mresp, err := c.MemberList(ctx)
+	cctx, ccancel := context.WithTimeout(ctx, c.cfg.AutoSyncInterval)
+	defer ccancel()
+	mresp, err := c.MemberList(cctx)
 	if err != nil {
+		eps := c.Endpoints()
+		for _, ep := range eps {
+			_, target, _ := ParseEndpoint(ep)
+			c.lg.Info("[etcd] reconnect target begin",
+				zap.String("url", target))
+			conn, err := c.dial(target)
+			if err == nil {
+				c.conn = conn
+				c.Cluster = NewCluster(c)
+				c.KV = NewKV(c)
+				c.Lease = NewLease(c)
+				c.Watcher = NewWatcher(c)
+				c.Auth = NewAuth(c)
+				c.Maintenance = NewMaintenance(c)
+
+				c.lg.Info("[etcd] reconnect target ok",
+					zap.String("url", target))
+				break
+			}
+		}
 		return err
 	}
 	var eps []string
@@ -229,7 +279,7 @@ func (c *Client) getToken(ctx context.Context) error {
 	for _, ep := range eps {
 		// use dial options without dopts to avoid reusing the client balancer
 		var dOpts []grpc.DialOption
-		target := ep
+		_, target, _ := ParseEndpoint(ep)
 		dOpts, err = c.dialSetupOpts(c.cfg.DialOptions...)
 		if err != nil {
 			err = fmt.Errorf("failed to configure auth dialer: %v", err)
@@ -362,9 +412,10 @@ func newClient(cfg *Config) (*Client, error) {
 	}
 	dialEndpoint := cfg.Endpoints[0]
 
+	_, dialTarget, _ := ParseEndpoint(dialEndpoint)
 	// Use a provided endpoint target so that for https:// without any tls config given, then
 	// grpc will assume the certificate server name is the endpoint host.
-	conn, err := client.dial(dialEndpoint)
+	conn, err := client.dial(dialTarget)
 	if err != nil {
 		client.cancel()
 		return nil, err
