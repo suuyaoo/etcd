@@ -186,7 +186,7 @@ func (c *Client) Sync(ctx context.Context) error {
 			_, target, _ := ParseEndpoint(ep)
 			c.lg.Info("[etcd] reconnect target begin",
 				zap.String("url", target))
-			conn, err := c.dial(target)
+			conn, err := c.dial(target, grpc.WithBlock())
 			if err == nil {
 				c.conn = conn
 				c.Cluster = NewCluster(c)
@@ -199,6 +199,8 @@ func (c *Client) Sync(ctx context.Context) error {
 				c.lg.Info("[etcd] reconnect target ok",
 					zap.String("url", target))
 				break
+			} else {
+				conn.Close()
 			}
 		}
 		return err
@@ -341,10 +343,11 @@ func (c *Client) dial(target string, dopts ...grpc.DialOption) (*grpc.ClientConn
 	opts = append(opts, c.cfg.DialOptions...)
 
 	dctx := c.ctx
+	var cancel context.CancelFunc
 	if c.cfg.DialTimeout > 0 {
-		var cancel context.CancelFunc
+		opts = append(opts, grpc.WithBlock())
 		dctx, cancel = context.WithTimeout(c.ctx, c.cfg.DialTimeout)
-		defer cancel() // TODO: Is this right for cases where grpc.WithBlock() is not set on the dial options?
+		defer cancel()
 	}
 
 	conn, err := grpc.DialContext(dctx, target, opts...)
