@@ -188,6 +188,9 @@ func (c *Client) Sync(ctx context.Context) error {
 				zap.String("url", target))
 			conn, err := c.dial(target, grpc.WithBlock())
 			if err == nil {
+				if c.conn != nil {
+					c.conn.Close()
+				}
 				c.conn = conn
 				c.Cluster = NewCluster(c)
 				c.KV = NewKV(c)
@@ -199,8 +202,6 @@ func (c *Client) Sync(ctx context.Context) error {
 				c.lg.Info("[etcd] reconnect target ok",
 					zap.String("url", target))
 				break
-			} else {
-				conn.Close()
 			}
 		}
 		return err
