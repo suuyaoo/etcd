@@ -716,9 +716,6 @@ func clusterVersionFromStore(lg *zap.Logger, st v2store.Store) *semver.Version {
 func ValidateClusterAndAssignIDs(lg *zap.Logger, local *RaftCluster, existing *RaftCluster) error {
 	ems := existing.Members()
 	lms := local.Members()
-	if len(ems) != len(lms) {
-		return fmt.Errorf("member count is unequal")
-	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
