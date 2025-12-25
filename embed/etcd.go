@@ -248,6 +248,7 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 			zap.Strings("listen-metrics-urls", e.cfg.getMetricsURLs()),
 		)
 	}
+	e.Server.AdjustTicks()
 	serving = true
 	return e, nil
 }

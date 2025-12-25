@@ -642,6 +642,9 @@ func (s *EtcdServer) adjustTicks() {
 			)
 		}
 		s.r.advanceTicks(ticks)
+		if s.Cfg.TickMs > 500 {
+			s.r.Campaign(s.ctx)
+		}
 		return
 	}
 
@@ -692,6 +695,10 @@ func (s *EtcdServer) adjustTicks() {
 			return
 		}
 	}
+}
+
+func (s *EtcdServer) AdjustTicks() {
+	s.goAttach(func() { s.adjustTicks() })
 }
 
 // Start performs any initialization of the Server necessary for it to
